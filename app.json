@@ -1,0 +1,26 @@
+{
+  "expo": {
+    "name": "CryptoEmpire",
+    "slug": "cryptoempire",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.henrquegomes.cryptoempire"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "031dc7d6-5efb-4932-90d5-ad2871960e28"
+      }
+    }
+  }
+}
