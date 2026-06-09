@@ -1,0 +1,5 @@
+0000000000000000000000000000000000000000 c10fd388ab2baf863d5054e6b722d820b693d0ce unknown <henriquegomes91@hotmail.com> 1781011448 -0300	commit (initial): first commit
+c10fd388ab2baf863d5054e6b722d820b693d0ce 3f4d4006b60e8e937ac0522d7c2ca83e7bba9fe1 unknown <henriquegomes91@hotmail.com> 1781017593 -0300	commit: first commit
+3f4d4006b60e8e937ac0522d7c2ca83e7bba9fe1 0000000000000000000000000000000000000000 unknown <henriquegomes91@hotmail.com> 1781017603 -0300	Branch: renamed refs/heads/master to refs/heads/main
+0000000000000000000000000000000000000000 3f4d4006b60e8e937ac0522d7c2ca83e7bba9fe1 unknown <henriquegomes91@hotmail.com> 1781017603 -0300	Branch: renamed refs/heads/master to refs/heads/main
+3f4d4006b60e8e937ac0522d7c2ca83e7bba9fe1 a5f653ae6a20ad2c91ba3e4067705e779d661798 unknown <henriquegomes91@hotmail.com> 1781018057 -0300	commit: Add GitHub build

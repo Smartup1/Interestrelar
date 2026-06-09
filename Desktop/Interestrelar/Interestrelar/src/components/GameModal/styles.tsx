@@ -1,0 +1,93 @@
+import { StyleSheet } from "react-native";
+
+export default StyleSheet.create({
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.85)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContent: {
+    backgroundColor: "#1a1a2e",
+    borderRadius: 30,
+    padding: 30,
+    alignItems: "center",
+    width: "85%",
+    borderWidth: 2,
+    borderColor: "#ffd700",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 10,
+  },
+  finalScoreText: {
+    fontSize: 32,
+    fontWeight: "bold",
+    color: "#ff4444",
+    marginBottom: 10,
+    textShadowColor: "rgba(0,0,0,0.5)",
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
+  },
+  finalScoreValue: {
+    fontSize: 64,
+    fontWeight: "bold",
+    color: "#ffd700",
+    marginBottom: 20,
+    textShadowColor: "rgba(0,0,0,0.5)",
+    textShadowOffset: { width: 2, height: 2 },
+    textShadowRadius: 3,
+  },
+  divider: {
+    width: "100%",
+    height: 2,
+    backgroundColor: "#ffffff30",
+    marginVertical: 20,
+  },
+  resourcesContainer: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    width: "100%",
+    marginBottom: 30,
+  },
+  resourceItem: {
+    alignItems: "center",
+  },
+  resourceIcon: {
+    fontSize: 36,
+    marginBottom: 5,
+  },
+  resourceValue: {
+    fontSize: 28,
+    fontWeight: "bold",
+    color: "#ffd700",
+  },
+  resourceLabel: {
+    fontSize: 14,
+    color: "#ccc",
+    marginTop: 5,
+  },
+  restartButton: {
+    backgroundColor: "#ff4444",
+    paddingHorizontal: 30,
+    paddingVertical: 15,
+    borderRadius: 50,
+    marginTop: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  restartButtonPressed: {
+    backgroundColor: "#cc0000",
+    transform: [{ scale: 0.98 }],
+  },
+  restartButtonText: {
+    color: "white",
+    fontSize: 18,
+    fontWeight: "bold",
+    letterSpacing: 1,
+  },
+});
