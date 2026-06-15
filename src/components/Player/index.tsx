@@ -45,6 +45,8 @@ export default function Player({ x, y, angle, shield = false, pulsating }: Playe
       <Animated.View style={{
         position: 'absolute',
         bottom: -8,
+        left: '50%',
+        marginLeft: -11,
         width: 22,
         height: 22,
         borderRadius: 11,
@@ -58,6 +60,8 @@ export default function Player({ x, y, angle, shield = false, pulsating }: Playe
       <Animated.View style={{
         position: 'absolute',
         bottom: -4,
+        left: '50%',
+        marginLeft: -7,
         width: 14,
         height: 14,
         borderRadius: 7,
