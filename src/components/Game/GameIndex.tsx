@@ -1,16 +1,27 @@
 import React, { useRef, useEffect, useState } from "react";
 import { View, PanResponder, TouchableOpacity, Animated } from "react-native";
+import { useRouter } from "expo-router";
 import Player from "../Player";
 import HUD from "../HUD";
-import GameModal from "../GameModal";
+import GameModal from "../GameModal/GameModal";
 import GameRenderer from "./GameRenderer";
 import { useGameLogic } from "./GameLogic";
 import { useSounds } from "../../utils/useSounds";
 import { createPulseAnimation } from "../../utils/animations";
 import { WIDTH, HEIGHT, GAME_CONFIG } from "../../constants/gameConfig";
+import { useDailyCredits } from "../../hooks/useDailyCredits";
 import styles from "./styles";
 
 export default function Game() {
+  const router = useRouter();
+  const { creditsLeft, totalCredits, useCredit, addCredit } = useDailyCredits();
+
+  // Ref sempre atualizada com créditos reais
+  const creditsLeftRef = useRef(creditsLeft);
+  useEffect(() => {
+    creditsLeftRef.current = creditsLeft;
+  }, [creditsLeft]);
+
   const {
     score, coins, gems, combo, lives, gameOver, shield,
     bullets, explosions, trail, obstacles, collectibles, player,
@@ -37,19 +48,16 @@ export default function Game() {
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const pulseAnimation = createPulseAnimation(pulseAnim);
 
-  // ✅ Ref para gameOver acessível dentro do PanResponder sem closure stale
   const gameOverRef = useRef(gameOver);
   useEffect(() => {
     gameOverRef.current = gameOver;
   }, [gameOver]);
 
-  // Ref para player acessível dentro do PanResponder
   const playerRef2 = useRef(player);
   useEffect(() => {
     playerRef2.current = player;
   }, [player]);
 
-  // Controles para sons
   const prevExplosionsLen = useRef(0);
   const prevCollectiblesLen = useRef(0);
 
@@ -81,7 +89,9 @@ export default function Game() {
     return () => pulseAnimation.stop();
   }, []);
 
-  const handleRestart = () => {
+  const handleRestart = async () => {
+    const ok = await useCredit(); // desconta ao reiniciar
+    if (!ok) return;
     restartGame();
     resumeBackground();
     prevExplosionsLen.current = 0;
@@ -97,11 +107,10 @@ export default function Game() {
 
   const panResponder = useRef(
     PanResponder.create({
-      // ✅ Usa ref para decisão sempre atualizada
       onStartShouldSetPanResponder: () => !gameOverRef.current,
       onMoveShouldSetPanResponder: () => !gameOverRef.current,
       onPanResponderMove: (_, gesture) => {
-        if (gameOverRef.current) return; // ✅ trava com ref, não closure
+        if (gameOverRef.current) return;
 
         const x = Math.max(0, Math.min(WIDTH - 40, gesture.moveX));
         const y = Math.max(0, Math.min(HEIGHT - 40, gesture.moveY));
@@ -160,7 +169,11 @@ export default function Game() {
         score={score}
         coins={coins}
         gems={gems}
+        creditsLeft={creditsLeft}
+        totalCredits={totalCredits}
         onRestart={handleRestart}
+        onEarnCredit={addCredit}
+        onHome={() => router.push('/')}
       />
     </View>
   );
