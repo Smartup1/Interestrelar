@@ -14,10 +14,11 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
+          cache: npm
 
       - name: Install Dependencies
-        run: npm install
+        run: npm ci
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -25,20 +26,19 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      - name: Install Expo CLI
-        run: npm install -g expo-cli
-
       - name: Generate Android Project
-        run: npx expo prebuild --platform android --non-interactive
+        run: npx expo prebuild --platform android --clean --non-interactive
 
       - name: Build APK
+        working-directory: android
         run: |
-          cd android
           chmod +x gradlew
-          ./gradlew assembleRelease
+          ./gradlew clean
+          ./gradlew assembleRelease --stacktrace --no-daemon
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
+        if: success()
         with:
           name: Interestrelar-APK
           path: android/app/build/outputs/apk/release/app-release.apk
