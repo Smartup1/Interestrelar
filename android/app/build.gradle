@@ -23,10 +23,8 @@ def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
 android {
     ndkVersion rootProject.ext.ndkVersion
-
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
-
     namespace 'com.henrquegomes.Interestrelar'
     defaultConfig {
         applicationId 'com.henrquegomes.Interestrelar'
@@ -68,6 +66,15 @@ android {
     androidResources {
         ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:!CVS:!thumbs.db:!picasa.ini:!*~'
     }
+
+    // FIX: garantir compatibilidade Java/Kotlin
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    kotlinOptions {
+        jvmTarget = '17'
+    }
 }
 
 ["pickFirsts", "excludes", "merges", "doNotStrip"].each { prop ->
@@ -82,7 +89,7 @@ android {
     }
 }
 
-// ─── FIX: força versão do play-services-ads compatível com Kotlin 2.1 ───────
+// ─── FIX: força versão do play-services-ads compatível com Kotlin 1.9.x ───────
 configurations.all {
     resolutionStrategy {
         force "com.google.android.gms:play-services-ads:23.6.0"

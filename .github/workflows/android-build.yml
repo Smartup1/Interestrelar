@@ -29,11 +29,16 @@ jobs:
       - name: Generate Android Project
         run: npx expo prebuild --platform android --clean --non-interactive
 
+      - name: Ensure gradlew is executable
+        run: chmod +x android/gradlew
+
+      - name: Clean & refresh Gradle deps
+        working-directory: android
+        run: ./gradlew --no-daemon clean --refresh-dependencies
+
       - name: Build APK
         working-directory: android
         run: |
-          chmod +x gradlew
-          ./gradlew clean
           ./gradlew assembleRelease --stacktrace --no-daemon
 
       - name: Upload APK
