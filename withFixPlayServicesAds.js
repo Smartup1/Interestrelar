@@ -5,7 +5,7 @@ module.exports = function withFixPlayServicesAds(config) {
     const contents = config.modResults.contents;
 
     const fix = `
-// FIX: alinha Kotlin stdlib e faz downgrade do play-services-ads para versão compatível
+// FIX: alinha Kotlin stdlib e faz downgrade do play-services-ads para versão compatível com react-native-google-mobile-ads
 subprojects {
     configurations.all {
         resolutionStrategy {
@@ -13,14 +13,14 @@ subprojects {
             force "org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.9.10"
             force "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.10"
             force "org.jetbrains.kotlin:kotlin-reflect:1.9.10"
-            force "com.google.android.gms:play-services-ads:24.0.0"
-            force "com.google.android.gms:play-services-ads-lite:24.0.0"
+            force "com.google.android.gms:play-services-ads:21.5.0"
+            force "com.google.android.gms:play-services-ads-lite:21.5.0"
         }
     }
 }
 `;
 
-    if (contents.includes("play-services-ads:24.0.0")) {
+    if (contents.includes("play-services-ads:21.5.0")) {
       return config;
     }
 
