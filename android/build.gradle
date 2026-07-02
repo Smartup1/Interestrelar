@@ -42,6 +42,13 @@ subprojects {
             if (details.requested.group == 'org.jetbrains.kotlin') {
                 details.useVersion kotlinVersion
             }
+            // Força versão do Google Mobile Ads SDK que expõe AgeRestrictedTreatment
+            if (details.requested.group == 'com.google.android.gms' &&
+                details.requested.name == 'play-services-ads') {
+                // Ajuste a versão aqui se preferir (ex.: '21.0.0' ou outra compatível)
+                details.useVersion '21.0.0'
+                details.because 'Garantir API AgeRestrictedTreatment usada por react-native-google-mobile-ads'
+            }
         }
     }
 }
