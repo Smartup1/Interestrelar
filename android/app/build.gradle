@@ -89,10 +89,10 @@ android {
     }
 }
 
-// ─── FIX: força versão do play-services-ads compatível com Kotlin 1.9.x ───────
+// ─── FIX: força versão do play-services-ads compatível com AgeRestrictedTreatment ───
 configurations.all {
     resolutionStrategy {
-        force "com.google.android.gms:play-services-ads:23.6.0"
+        force "com.google.android.gms:play-services-ads:23.2.0"
     }
 }
 // ─────────────────────────────────────────────────────────────────────────────
@@ -100,8 +100,8 @@ configurations.all {
 dependencies {
     implementation("com.facebook.react:react-android")
 
-    // FIX: versão explícita para evitar pull automático do 25.x
-    implementation("com.google.android.gms:play-services-ads:23.6.0")
+    // FIX: versão com suporte a AgeRestrictedTreatment (API 31+)
+    implementation("com.google.android.gms:play-services-ads:23.2.0")
 
     def isGifEnabled = (findProperty('expo.gif.enabled') ?: "") == "true";
     def isWebpEnabled = (findProperty('expo.webp.enabled') ?: "") == "true";
