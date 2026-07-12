@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from "react";
-import { View, PanResponder, TouchableOpacity, Animated } from "react-native";
+import { View, Pressable, Animated } from "react-native";
 import { useRouter } from "expo-router";
 import Player from "../Player";
 import HUD from "../HUD";
@@ -10,6 +10,7 @@ import { useSounds } from "../../utils/useSounds";
 import { createPulseAnimation } from "../../utils/animations";
 import { WIDTH, HEIGHT, GAME_CONFIG } from "../../constants/gameConfig";
 import { useDailyCredits } from "../../hooks/useDailyCredits";
+import { useTiltControl } from "../../hooks/useTiltControl";
 import styles from "./styles";
 
 export default function Game() {
@@ -105,31 +106,64 @@ export default function Game() {
     }
   };
 
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => !gameOverRef.current,
-      onMoveShouldSetPanResponder: () => !gameOverRef.current,
-      onPanResponderMove: (_, gesture) => {
-        if (gameOverRef.current) return;
+  // Controle por inclinação do celular (substitui o arrastar com o dedo)
+  const tiltRef = useTiltControl({
+    enabled: !gameOver,
+    updateIntervalMs: GAME_CONFIG.TILT_UPDATE_INTERVAL,
+  });
 
-        const x = Math.max(0, Math.min(WIDTH - 40, gesture.moveX));
-        const y = Math.max(0, Math.min(HEIGHT - 40, gesture.moveY));
+  useEffect(() => {
+    let raf: number;
 
-        const dx = x - playerRef2.current.x;
-        const dy = y - playerRef2.current.y;
-        let angle = playerRef2.current.angle;
+    const moveLoop = () => {
+      if (!gameOverRef.current) {
+        const { x: rawX, y: rawY } = tiltRef.current;
 
-        if (Math.abs(dx) > 0.1 || Math.abs(dy) > 0.1) {
-          angle = Math.atan2(dx, -dy) * (180 / Math.PI);
+        const dz = GAME_CONFIG.TILT_DEADZONE;
+        const tx = Math.abs(rawX) > dz ? rawX : 0;
+        const ty = Math.abs(rawY) > dz ? rawY : 0;
+
+        // Converte inclinação (em G) em velocidade, limitada à velocidade máxima
+        const vx = Math.max(
+          -GAME_CONFIG.TILT_MAX_SPEED,
+          Math.min(GAME_CONFIG.TILT_MAX_SPEED, tx * GAME_CONFIG.TILT_SENSITIVITY * GAME_CONFIG.TILT_MAX_SPEED)
+        ) * GAME_CONFIG.TILT_INVERT_X;
+
+        const vy = Math.max(
+          -GAME_CONFIG.TILT_MAX_SPEED,
+          Math.min(GAME_CONFIG.TILT_MAX_SPEED, ty * GAME_CONFIG.TILT_SENSITIVITY * GAME_CONFIG.TILT_MAX_SPEED)
+        ) * GAME_CONFIG.TILT_INVERT_Y;
+
+        if (vx !== 0 || vy !== 0) {
+          const nx = Math.max(0, Math.min(WIDTH - 40, playerRef2.current.x + vx));
+          const ny = Math.max(0, Math.min(HEIGHT - 40, playerRef2.current.y + vy));
+
+          const dx = nx - playerRef2.current.x;
+          const dy = ny - playerRef2.current.y;
+          let angle = playerRef2.current.angle;
+
+          if (Math.abs(dx) > 0.1 || Math.abs(dy) > 0.1) {
+            angle = Math.atan2(dx, -dy) * (180 / Math.PI);
+          }
+
+          updatePlayerPosition(nx, ny, angle);
         }
+      }
 
-        updatePlayerPosition(x, y, angle);
-      },
-    })
-  ).current;
+      raf = requestAnimationFrame(moveLoop);
+    };
+
+    raf = requestAnimationFrame(moveLoop);
+    return () => cancelAnimationFrame(raf);
+  }, []);
 
   return (
-    <View style={styles.container} {...panResponder.panHandlers}>
+    <Pressable
+      style={styles.container}
+      onPressIn={handleShoot}
+      onPressOut={stopShooting}
+      disabled={gameOver}
+    >
       <HUD score={score} coins={coins} gems={gems} combo={combo} lives={lives} />
 
       <GameRenderer
@@ -145,10 +179,9 @@ export default function Game() {
         gameOver={gameOver}
       />
 
-      <TouchableOpacity
-        activeOpacity={gameOver ? 1 : 0.7}
-        onPressIn={handleShoot}
-        onPressOut={stopShooting}
+      {/* Nave: posição controlada pela inclinação do celular, não mais pelo toque */}
+      <View
+        pointerEvents="none"
         style={{
           position: 'absolute',
           left: player.x,
@@ -159,10 +192,9 @@ export default function Game() {
           alignItems: 'center',
           zIndex: 10,
         }}
-        disabled={gameOver}
       >
         <Player x={0} y={0} angle={player.angle} />
-      </TouchableOpacity>
+      </View>
 
       <GameModal
         visible={gameOver}
@@ -175,6 +207,6 @@ export default function Game() {
         onEarnCredit={addCredit}
         onHome={() => router.push('/')}
       />
-    </View>
+    </Pressable>
   );
 }

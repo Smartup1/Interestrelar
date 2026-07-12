@@ -3,10 +3,10 @@ import { View, Text, Modal, Pressable, TouchableWithoutFeedback, Animated, Easin
 import { LinearGradient } from "expo-linear-gradient";
 
 // Importa o hook de anúncio apenas no mobile
-const useRewardedAdMob = Platform.OS !== 'web'
-  ? require('../../hooks/useRewardedAd').useRewardedAd
-  : null;
-
+const hookToUse =
+  Platform.OS !== 'web' && useRewardedAdMob
+    ? useRewardedAdMob
+    : useRewardedAdStub;
 interface GameModalProps {
   visible: boolean;
   score: number;
