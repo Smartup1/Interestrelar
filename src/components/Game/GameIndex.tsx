@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from "react";
-import { View, Pressable, Animated } from "react-native";
+import { View, PanResponder, Animated } from "react-native";
 import { useRouter } from "expo-router";
 import Player from "../Player";
 import HUD from "../HUD";
@@ -10,7 +10,7 @@ import { useSounds } from "../../utils/useSounds";
 import { createPulseAnimation } from "../../utils/animations";
 import { WIDTH, HEIGHT, GAME_CONFIG } from "../../constants/gameConfig";
 import { useDailyCredits } from "../../hooks/useDailyCredits";
-import { useTiltControl } from "../../hooks/useTiltControl";
+import { useTiltSteering } from "../../hooks/useTiltSteering";
 import styles from "./styles";
 
 export default function Game() {
@@ -59,6 +59,10 @@ export default function Game() {
     playerRef2.current = player;
   }, [player]);
 
+  // Controle por inclinação do celular
+  const tiltX = useTiltSteering();
+  const isDraggingRef = useRef(false);
+
   const prevExplosionsLen = useRef(0);
   const prevCollectiblesLen = useRef(0);
 
@@ -90,6 +94,33 @@ export default function Game() {
     return () => pulseAnimation.stop();
   }, []);
 
+  // Aplica a inclinação do celular como movimento lateral contínuo da nave.
+  // Enquanto o jogador está arrastando o dedo, o ângulo continua sendo
+  // controlado pelo toque; quando solta, a nave "curva" na direção do tilt.
+  useEffect(() => {
+    const TILT_SENSITIVITY = 6;  // px por tick, por unidade de inclinação
+    const MAX_BANK_ANGLE = 35;   // graus máx. de inclinação visual
+    const DEAD_ZONE = 0.05;      // ignora tremores pequenos do sensor
+
+    const interval = setInterval(() => {
+      if (gameOverRef.current) return;
+
+      const tilt = tiltX.current;
+      if (Math.abs(tilt) < DEAD_ZONE) return;
+
+      const current = playerRef2.current;
+      const newX = Math.max(0, Math.min(WIDTH - 90, current.x - tilt * TILT_SENSITIVITY));
+
+      const newAngle = isDraggingRef.current
+        ? current.angle
+        : -tilt * MAX_BANK_ANGLE;
+
+      updatePlayerPosition(newX, current.y, newAngle);
+    }, 33); // ~30x por segundo
+
+    return () => clearInterval(interval);
+  }, []);
+
   const handleRestart = async () => {
     const ok = await useCredit(); // desconta ao reiniciar
     if (!ok) return;
@@ -106,64 +137,47 @@ export default function Game() {
     }
   };
 
-  // Controle por inclinação do celular (substitui o arrastar com o dedo)
-  const tiltRef = useTiltControl({
-    enabled: !gameOver,
-    updateIntervalMs: GAME_CONFIG.TILT_UPDATE_INTERVAL,
-  });
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => !gameOverRef.current,
+      onMoveShouldSetPanResponder: () => !gameOverRef.current,
+      onPanResponderGrant: () => {
+        if (gameOverRef.current) return;
+        isDraggingRef.current = true;
+        // Ao tocar em qualquer ponto da tela (inclusive na própria nave),
+        // já começa a atirar continuamente, sem bloquear o arrasto.
+        handleShoot();
+      },
+      onPanResponderMove: (_, gesture) => {
+        if (gameOverRef.current) return;
+        isDraggingRef.current = true;
 
-  useEffect(() => {
-    let raf: number;
+        const x = Math.max(0, Math.min(WIDTH - 90, gesture.moveX));
+        const y = Math.max(0, Math.min(HEIGHT - 90, gesture.moveY));
 
-    const moveLoop = () => {
-      if (!gameOverRef.current) {
-        const { x: rawX, y: rawY } = tiltRef.current;
+        const dx = x - playerRef2.current.x;
+        const dy = y - playerRef2.current.y;
+        let angle = playerRef2.current.angle;
 
-        const dz = GAME_CONFIG.TILT_DEADZONE;
-        const tx = Math.abs(rawX) > dz ? rawX : 0;
-        const ty = Math.abs(rawY) > dz ? rawY : 0;
-
-        // Converte inclinação (em G) em velocidade, limitada à velocidade máxima
-        const vx = Math.max(
-          -GAME_CONFIG.TILT_MAX_SPEED,
-          Math.min(GAME_CONFIG.TILT_MAX_SPEED, tx * GAME_CONFIG.TILT_SENSITIVITY * GAME_CONFIG.TILT_MAX_SPEED)
-        ) * GAME_CONFIG.TILT_INVERT_X;
-
-        const vy = Math.max(
-          -GAME_CONFIG.TILT_MAX_SPEED,
-          Math.min(GAME_CONFIG.TILT_MAX_SPEED, ty * GAME_CONFIG.TILT_SENSITIVITY * GAME_CONFIG.TILT_MAX_SPEED)
-        ) * GAME_CONFIG.TILT_INVERT_Y;
-
-        if (vx !== 0 || vy !== 0) {
-          const nx = Math.max(0, Math.min(WIDTH - 40, playerRef2.current.x + vx));
-          const ny = Math.max(0, Math.min(HEIGHT - 40, playerRef2.current.y + vy));
-
-          const dx = nx - playerRef2.current.x;
-          const dy = ny - playerRef2.current.y;
-          let angle = playerRef2.current.angle;
-
-          if (Math.abs(dx) > 0.1 || Math.abs(dy) > 0.1) {
-            angle = Math.atan2(dx, -dy) * (180 / Math.PI);
-          }
-
-          updatePlayerPosition(nx, ny, angle);
+        if (Math.abs(dx) > 0.1 || Math.abs(dy) > 0.1) {
+          angle = Math.atan2(dx, -dy) * (180 / Math.PI);
         }
-      }
 
-      raf = requestAnimationFrame(moveLoop);
-    };
-
-    raf = requestAnimationFrame(moveLoop);
-    return () => cancelAnimationFrame(raf);
-  }, []);
+        updatePlayerPosition(x, y, angle);
+      },
+      onPanResponderRelease: () => {
+        isDraggingRef.current = false;
+        stopShooting();
+      },
+      onPanResponderTerminate: () => {
+        isDraggingRef.current = false;
+        stopShooting();
+      },
+    })
+  ).current;
 
   return (
-    <Pressable
-      style={styles.container}
-      onPressIn={handleShoot}
-      onPressOut={stopShooting}
-      disabled={gameOver}
-    >
+    <View style={styles.container} {...panResponder.panHandlers}>
       <HUD score={score} coins={coins} gems={gems} combo={combo} lives={lives} />
 
       <GameRenderer
@@ -179,7 +193,6 @@ export default function Game() {
         gameOver={gameOver}
       />
 
-      {/* Nave: posição controlada pela inclinação do celular, não mais pelo toque */}
       <View
         pointerEvents="none"
         style={{
@@ -207,6 +220,6 @@ export default function Game() {
         onEarnCredit={addCredit}
         onHome={() => router.push('/')}
       />
-    </Pressable>
+    </View>
   );
 }
