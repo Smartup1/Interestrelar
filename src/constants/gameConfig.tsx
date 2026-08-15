@@ -31,4 +31,14 @@ export const GAME_CONFIG = {
   OBSTACLE_COUNT: 5,             // 8 → 5 (menos obstáculos)
   STAR_COUNT: 50,                // 150 → 50 (muito mais leve)
   GAME_LOOP_INTERVAL: 60,        // 40 → 60 (loop mais lento = mais performance)
+
+  // Controle por inclinação (acelerômetro)
+  TILT_UPDATE_INTERVAL: 16,      // ~60fps de leitura do sensor
+  TILT_DEADZONE: 0.04,           // ignora tremidas pequenas do sensor
+  TILT_MAX_SPEED: 9,             // pixels por frame de movimento na inclinação máxima
+  TILT_SENSITIVITY: 4,           // quanto a inclinação (em G) é amplificada antes de virar velocidade
+  // Se os controles saírem invertidos no aparelho do jogador, basta trocar
+  // estes dois valores entre 1 e -1.
+  TILT_INVERT_X: 1,
+  TILT_INVERT_Y: -1,
 };

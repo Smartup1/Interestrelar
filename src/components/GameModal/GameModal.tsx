@@ -3,9 +3,6 @@ import { View, Text, Modal, Pressable, TouchableWithoutFeedback, Animated, Easin
 import { LinearGradient } from "expo-linear-gradient";
 
 // Importa o hook de anúncio apenas no mobile
-const useRewardedAdMob = Platform.OS !== 'web'
-  ? require('../../hooks/useRewardedAd').useRewardedAd
-  : null;
 
 interface GameModalProps {
   visible: boolean;
@@ -29,19 +26,27 @@ function useRewardedAdStub(onRewarded: () => void) {
 }
 
 export default function GameModal({
-  visible, score, coins, gems,
-  creditsLeft = 0, totalCredits = 5,
-  onRestart, onHome, onEarnCredit,
+  visible,
+  score,
+  coins,
+  gems,
+  creditsLeft = 0,
+  totalCredits = 5,
+  onRestart,
+  onHome,
+  onEarnCredit,
 }: GameModalProps) {
   const cardScale = useRef(new Animated.Value(0.7)).current;
   const cardOpacity = useRef(new Animated.Value(0)).current;
   const glowAnim = useRef(new Animated.Value(0)).current;
   const btnScale = useRef(new Animated.Value(1)).current;
 
-  const hookToUse = Platform.OS !== 'web' && useRewardedAd ? useRewardedAd : useRewardedAdStub;
-  const { show, loaded, loading } = hookToUse(async () => {
-    if (onEarnCredit) await onEarnCredit();
+  const { show, loaded, loading } = useRewardedAdStub(async () => {
+    if (onEarnCredit) {
+      await onEarnCredit();
+    }
   });
+
 
   useEffect(() => {
     if (visible) {

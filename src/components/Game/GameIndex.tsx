@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from "react";
-import { View, PanResponder, TouchableOpacity, Animated } from "react-native";
+import { View, PanResponder, Animated } from "react-native";
 import { useRouter } from "expo-router";
 import Player from "../Player";
 import HUD from "../HUD";
@@ -10,6 +10,7 @@ import { useSounds } from "../../utils/useSounds";
 import { createPulseAnimation } from "../../utils/animations";
 import { WIDTH, HEIGHT, GAME_CONFIG } from "../../constants/gameConfig";
 import { useDailyCredits } from "../../hooks/useDailyCredits";
+import { useTiltSteering } from "../../hooks/useTiltSteering";
 import styles from "./styles";
 
 export default function Game() {
@@ -58,6 +59,10 @@ export default function Game() {
     playerRef2.current = player;
   }, [player]);
 
+  // Controle por inclinação do celular
+  const tiltX = useTiltSteering();
+  const isDraggingRef = useRef(false);
+
   const prevExplosionsLen = useRef(0);
   const prevCollectiblesLen = useRef(0);
 
@@ -89,6 +94,33 @@ export default function Game() {
     return () => pulseAnimation.stop();
   }, []);
 
+  // Aplica a inclinação do celular como movimento lateral contínuo da nave.
+  // Enquanto o jogador está arrastando o dedo, o ângulo continua sendo
+  // controlado pelo toque; quando solta, a nave "curva" na direção do tilt.
+  useEffect(() => {
+    const TILT_SENSITIVITY = 6;  // px por tick, por unidade de inclinação
+    const MAX_BANK_ANGLE = 35;   // graus máx. de inclinação visual
+    const DEAD_ZONE = 0.05;      // ignora tremores pequenos do sensor
+
+    const interval = setInterval(() => {
+      if (gameOverRef.current) return;
+
+      const tilt = tiltX.current;
+      if (Math.abs(tilt) < DEAD_ZONE) return;
+
+      const current = playerRef2.current;
+      const newX = Math.max(0, Math.min(WIDTH - 90, current.x - tilt * TILT_SENSITIVITY));
+
+      const newAngle = isDraggingRef.current
+        ? current.angle
+        : -tilt * MAX_BANK_ANGLE;
+
+      updatePlayerPosition(newX, current.y, newAngle);
+    }, 33); // ~30x por segundo
+
+    return () => clearInterval(interval);
+  }, []);
+
   const handleRestart = async () => {
     const ok = await useCredit(); // desconta ao reiniciar
     if (!ok) return;
@@ -109,11 +141,19 @@ export default function Game() {
     PanResponder.create({
       onStartShouldSetPanResponder: () => !gameOverRef.current,
       onMoveShouldSetPanResponder: () => !gameOverRef.current,
+      onPanResponderGrant: () => {
+        if (gameOverRef.current) return;
+        isDraggingRef.current = true;
+        // Ao tocar em qualquer ponto da tela (inclusive na própria nave),
+        // já começa a atirar continuamente, sem bloquear o arrasto.
+        handleShoot();
+      },
       onPanResponderMove: (_, gesture) => {
         if (gameOverRef.current) return;
+        isDraggingRef.current = true;
 
-        const x = Math.max(0, Math.min(WIDTH - 40, gesture.moveX));
-        const y = Math.max(0, Math.min(HEIGHT - 40, gesture.moveY));
+        const x = Math.max(0, Math.min(WIDTH - 90, gesture.moveX));
+        const y = Math.max(0, Math.min(HEIGHT - 90, gesture.moveY));
 
         const dx = x - playerRef2.current.x;
         const dy = y - playerRef2.current.y;
@@ -124,6 +164,14 @@ export default function Game() {
         }
 
         updatePlayerPosition(x, y, angle);
+      },
+      onPanResponderRelease: () => {
+        isDraggingRef.current = false;
+        stopShooting();
+      },
+      onPanResponderTerminate: () => {
+        isDraggingRef.current = false;
+        stopShooting();
       },
     })
   ).current;
@@ -145,10 +193,8 @@ export default function Game() {
         gameOver={gameOver}
       />
 
-      <TouchableOpacity
-        activeOpacity={gameOver ? 1 : 0.7}
-        onPressIn={handleShoot}
-        onPressOut={stopShooting}
+      <View
+        pointerEvents="none"
         style={{
           position: 'absolute',
           left: player.x,
@@ -159,10 +205,9 @@ export default function Game() {
           alignItems: 'center',
           zIndex: 10,
         }}
-        disabled={gameOver}
       >
         <Player x={0} y={0} angle={player.angle} />
-      </TouchableOpacity>
+      </View>
 
       <GameModal
         visible={gameOver}
