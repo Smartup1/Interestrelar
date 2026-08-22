@@ -12,7 +12,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { router } from "expo-router";
 import { useDailyCredits } from '../src/hooks/useDailyCredits';
 
 const { width, height } = Dimensions.get('window');
@@ -362,60 +362,110 @@ export default function HomeScreen() {
             </Animated.View>
 
             {/* Botões secundários */}
-            <View style={{ flexDirection: 'row', gap: 10 }}>
-              <TouchableOpacity
-                onPress={() => setShowHowTo(true)}
-                style={{
-                  flex: 1,
-                  paddingVertical: 14,
-                  borderRadius: 50,
-                  alignItems: 'center',
-                  backgroundColor: 'rgba(255,255,255,0.05)',
-                  borderWidth: 1,
-                  borderColor: 'rgba(255,255,255,0.1)',
-                  flexDirection: 'row',
-                  justifyContent: 'center',
-                  gap: 6,
-                }}
-                activeOpacity={0.75}
-              >
-                <Text style={{ fontSize: 16 }}>🎮</Text>
-                <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, fontWeight: '700', letterSpacing: 1 }}>
-                  COMO JOGAR
-                </Text>
-              </TouchableOpacity>
+         
+<View style={{ gap: 10 }}>
 
-              <TouchableOpacity
-                style={{
-                  flex: 1,
-                  paddingVertical: 14,
-                  borderRadius: 50,
-                  alignItems: 'center',
-                  backgroundColor: 'rgba(255,255,255,0.05)',
-                  borderWidth: 1,
-                  borderColor: 'rgba(255,255,255,0.1)',
-                  flexDirection: 'row',
-                  justifyContent: 'center',
-                  gap: 6,
-                }}
-                activeOpacity={0.75}
-              >
-                <Text style={{ fontSize: 16 }}>⚙️</Text>
-                <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, fontWeight: '700', letterSpacing: 1 }}>
-                  OPÇÕES
-                </Text>
-              </TouchableOpacity>
-            </View>
+  {/* MINHAS NAVES */}
+  <TouchableOpacity
+    onPress={() => router.push('/ships')}
+    activeOpacity={0.8}
+    style={{
+      paddingVertical: 15,
+      borderRadius: 50,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'rgba(0,150,255,0.12)',
+      borderWidth: 1,
+      borderColor: 'rgba(0,210,255,0.35)',
+      flexDirection: 'row',
+      gap: 8,
+    }}
+  >
+    <Text style={{ fontSize: 19 }}>
+      🚀
+    </Text>
 
-            {/* Rodapé */}
-            <View style={{ alignItems: 'center', marginTop: 4 }}>
-              <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)', letterSpacing: 1 }}>
-                v1.0.0  ·  Interestelar Game  ·  {creditsLeft}/{totalCredits} jogadas hoje
-              </Text>
-            </View>
-          </View>
-        </View>
-      </LinearGradient>
+    <Text
+      style={{
+        color: '#00D9FF',
+        fontSize: 13,
+        fontWeight: '800',
+        letterSpacing: 2,
+      }}
+    >
+      MINHAS NAVES
+    </Text>
+  </TouchableOpacity>
+
+  {/* COMO JOGAR + OPÇÕES */}
+  <View style={{ flexDirection: 'row', gap: 10 }}>
+
+    <TouchableOpacity
+      onPress={() => setShowHowTo(true)}
+      style={{
+        flex: 1,
+        paddingVertical: 14,
+        borderRadius: 50,
+        alignItems: 'center',
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+        flexDirection: 'row',
+        justifyContent: 'center',
+        gap: 6,
+      }}
+      activeOpacity={0.75}
+    >
+      <Text style={{ fontSize: 16 }}>
+        🎮
+      </Text>
+
+      <Text
+        style={{
+          color: 'rgba(255,255,255,0.7)',
+          fontSize: 12,
+          fontWeight: '700',
+          letterSpacing: 1,
+        }}
+      >
+        COMO JOGAR
+      </Text>
+    </TouchableOpacity>
+
+    <TouchableOpacity
+      style={{
+        flex: 1,
+        paddingVertical: 14,
+        borderRadius: 50,
+        alignItems: 'center',
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+        flexDirection: 'row',
+        justifyContent: 'center',
+        gap: 6,
+      }}
+      activeOpacity={0.75}
+    >
+      <Text style={{ fontSize: 16 }}>
+        ⚙️
+      </Text>
+
+      <Text
+        style={{
+          color: 'rgba(255,255,255,0.7)',
+          fontSize: 12,
+          fontWeight: '700',
+          letterSpacing: 1,
+        }}
+      >
+        OPÇÕES
+      </Text>
+    </TouchableOpacity>
+
+  </View>
+</View>
+</LinearGradient>
 
       {/* Modais */}
       <NoCreditsModal visible={showNoCredits} resetInfo={resetInfo} onClose={() => setShowNoCredits(false)} />
