@@ -14,8 +14,7 @@ import {
   router,
 } from "expo-router";
 
-import ShipCard from "../src/components/Ships/ShipCard";
-
+import ShipCard from "../src/components/ShipCard";
 import {
   useShips,
 } from "../src/hooks/useShips";
