@@ -12,7 +12,6 @@ import {
   ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
 import { router } from "expo-router";
 import { useDailyCredits } from '../src/hooks/useDailyCredits';
 
