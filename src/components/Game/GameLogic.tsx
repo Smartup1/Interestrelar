@@ -1,4 +1,5 @@
 import { useRef, useState, useEffect } from "react";
+
 import {
   WIDTH,
   HEIGHT,
@@ -29,8 +30,6 @@ import {
  * MULTIPLICADOR DE DIFICULDADE
  * ============================================================
  *
- * A dificuldade aumenta progressivamente conforme o score.
- *
  * 0       -> 1.0x
  * 500     -> 1.1x
  * 1000    -> 1.2x
@@ -39,28 +38,26 @@ import {
  * 2500    -> 1.5x
  * 3000    -> 1.6x
  * 3500+   -> 1.7x
- *
- * Antes:
- * 1x -> 2x -> 3x -> 4x ... -> 30x
- *
- * Isso poderia tornar o jogo impossível em scores altos.
  */
 
 function getSpeedMultiplier(score: number): number {
-  const min = 1.0;
-  const max = 1.7;
-
-  const increase = Math.floor(score / 500) * 0.1;
-
-  return Math.min(min + increase, max);
+  return Math.min(
+    1.0 + Math.floor(score / 500) * 0.1,
+    1.7
+  );
 }
 
+/**
+ * ============================================================
+ * GAME LOGIC
+ * ============================================================
+ */
+
 export function useGameLogic() {
-  /**
-   * ============================================================
-   * ESTADOS DO REACT
-   * ============================================================
-   */
+
+  // ==========================================================
+  // ESTADOS PRINCIPAIS
+  // ==========================================================
 
   const [score, setScore] = useState(0);
   const [coins, setCoins] = useState(0);
@@ -68,6 +65,11 @@ export function useGameLogic() {
   const [combo, setCombo] = useState(0);
   const [lives, setLives] = useState(3);
   const [gameOver, setGameOver] = useState(false);
+  const [shield, setShield] = useState(false);
+
+  // ==========================================================
+  // ENTIDADES DO JOGO
+  // ==========================================================
 
   const [bullets, setBullets] = useState<Bullet[]>([]);
   const [explosions, setExplosions] = useState<Explosion[]>([]);
@@ -76,7 +78,9 @@ export function useGameLogic() {
   const [collectibles, setCollectibles] =
     useState<Collectible[]>([]);
 
-  const [shield, setShield] = useState(false);
+  // ==========================================================
+  // PLAYER
+  // ==========================================================
 
   const [player, setPlayer] =
     useState<PlayerPosition>({
@@ -85,11 +89,9 @@ export function useGameLogic() {
       angle: 0,
     });
 
-  /**
-   * ============================================================
-   * IDS
-   * ============================================================
-   */
+  // ==========================================================
+  // IDS
+  // ==========================================================
 
   const bulletId = useRef(0);
   const explosionId = useRef(0);
@@ -97,16 +99,9 @@ export function useGameLogic() {
   const collectibleId = useRef(1000);
   const trailId = useRef(0);
 
-  /**
-   * ============================================================
-   * REFS DO PLAYER / GAME
-   * ============================================================
-   *
-   * Esses refs são utilizados pelo Game Loop.
-   *
-   * O objetivo é evitar que o loop precise depender dos estados
-   * do React e seja recriado toda vez que shield/gameOver mudar.
-   */
+  // ==========================================================
+  // REFS DA GAME ENGINE
+  // ==========================================================
 
   const playerRef = useRef({
     x: WIDTH * 0.5,
@@ -114,18 +109,12 @@ export function useGameLogic() {
   });
 
   const tickRef = useRef(0);
-
   const scoreRef = useRef(0);
+  const comboRef = useRef(0);
+  const livesRef = useRef(3);
 
-  /**
-   * ============================================================
-   * REFS DO ENGINE
-   * ============================================================
-   *
-   * O Game Loop trabalha principalmente com esses refs.
-   *
-   * Depois do cálculo, sincronizamos com o React.
-   */
+  const shieldRef = useRef(false);
+  const gameOverRef = useRef(false);
 
   const bulletsRef = useRef<Bullet[]>([]);
   const explosionsRef = useRef<Explosion[]>([]);
@@ -133,27 +122,9 @@ export function useGameLogic() {
   const collectiblesRef =
     useRef<Collectible[]>([]);
 
-  const comboRef = useRef(0);
-  const livesRef = useRef(3);
-  const shieldRef = useRef(false);
-  const gameOverRef = useRef(false);
-
-  /**
-   * ============================================================
-   * SHOOTING
-   * ============================================================
-   */
-
-  const shootIntervalRef =
-    useRef<ReturnType<typeof setInterval> | null>(
-      null
-    );
-
-  /**
-   * ============================================================
-   * SINCRONIZAÇÃO DOS REFS
-   * ============================================================
-   */
+  // ==========================================================
+  // SINCRONIZAÇÕES
+  // ==========================================================
 
   useEffect(() => {
     shieldRef.current = shield;
@@ -163,13 +134,12 @@ export function useGameLogic() {
     gameOverRef.current = gameOver;
   }, [gameOver]);
 
-  /**
-   * ============================================================
-   * INICIALIZAÇÃO
-   * ============================================================
-   */
+  // ==========================================================
+  // INICIALIZAÇÃO DO CENÁRIO
+  // ==========================================================
 
   useEffect(() => {
+
     const initialObstacles =
       createInitialObstacles(
         GAME_CONFIG.OBSTACLE_COUNT
@@ -187,41 +157,19 @@ export function useGameLogic() {
     setObstacles(initialObstacles);
     setCollectibles(initialCollectibles);
 
-    return () => {
-      if (shootIntervalRef.current) {
-        clearInterval(
-          shootIntervalRef.current
-        );
-
-        shootIntervalRef.current = null;
-      }
-    };
   }, []);
 
-  /**
-   * ============================================================
-   * GAME LOOP
-   * ============================================================
-   *
-   * IMPORTANTE:
-   *
-   * O loop agora possui dependências [].
-   *
-   * Portanto ele não é destruído/recriado quando:
-   *
-   * - shield muda
-   * - gameOver muda
-   * - score muda
-   * - player muda
-   *
-   * O estado interno é lido através dos refs.
-   */
+  // ==========================================================
+  // GAME LOOP
+  // ==========================================================
 
   useEffect(() => {
+
     const loop = setInterval(() => {
-      /**
-       * Se o jogo acabou, não processa o frame.
-       */
+
+      // ------------------------------------------------------
+      // GAME OVER
+      // ------------------------------------------------------
 
       if (gameOverRef.current) {
         return;
@@ -229,31 +177,28 @@ export function useGameLogic() {
 
       tickRef.current++;
 
-      /**
-       * ========================================================
-       * SCORE
-       * ========================================================
-       */
+      // ------------------------------------------------------
+      // SCORE AUTOMÁTICO
+      // ------------------------------------------------------
 
       const nextScore =
         scoreRef.current + 1;
 
-      scoreRef.current = nextScore;
+      scoreRef.current =
+        nextScore;
 
       setScore(nextScore);
 
-      /**
-       * Calcula a dificuldade usando o score atual.
-       */
+      // ------------------------------------------------------
+      // DIFICULDADE
+      // ------------------------------------------------------
 
       const speedMult =
         getSpeedMultiplier(nextScore);
 
-      /**
-       * ========================================================
-       * BALAS
-       * ========================================================
-       */
+      // ------------------------------------------------------
+      // VARIÁVEIS DO FRAME
+      // ------------------------------------------------------
 
       let nextBullets: Bullet[] = [];
 
@@ -266,20 +211,23 @@ export function useGameLogic() {
       const newExplosions: Explosion[] =
         [];
 
-      /**
-       * Processa cada bala.
-       */
+      // ======================================================
+      // 1. BALAS
+      // ======================================================
 
-      for (const bullet of bulletsRef.current) {
+      for (
+        const bullet of bulletsRef.current
+      ) {
+
         const nx =
           bullet.x + bullet.vx;
 
         const ny =
           bullet.y + bullet.vy;
 
-        /**
-         * Bala saiu da tela.
-         */
+        // ----------------------------------------------------
+        // BALA FORA DA TELA
+        // ----------------------------------------------------
 
         if (
           nx < -20 ||
@@ -292,37 +240,34 @@ export function useGameLogic() {
 
         let hit = false;
 
-        /**
-         * Verifica colisão da bala
-         * com os obstáculos.
-         */
+        // ----------------------------------------------------
+        // COLISÃO COM OBSTÁCULOS
+        // ----------------------------------------------------
 
         nextObstacles =
           nextObstacles.map(
             (obstacle) => {
-              if (
+
+              const hitObstacle =
                 !hit &&
                 Math.abs(
                   obstacle.x - nx
                 ) < 35 &&
                 Math.abs(
                   obstacle.y - ny
-                ) < 35
-              ) {
+                ) < 35;
+
+              if (hitObstacle) {
+
                 hit = true;
 
-                /**
-                 * Pontuação por destruir obstáculo.
-                 */
-
+                // Pontuação
                 scoreBonus += 50;
 
+                // Combo
                 comboIncrease += 1;
 
-                /**
-                 * Cria explosão.
-                 */
-
+                // Explosão
                 newExplosions.push({
                   id:
                     explosionId.current++,
@@ -330,10 +275,7 @@ export function useGameLogic() {
                   y: obstacle.y,
                 });
 
-                /**
-                 * Reposiciona obstáculo.
-                 */
-
+                // Recria obstáculo
                 return randomObstacle(
                   obstacleId.current++
                 );
@@ -343,34 +285,31 @@ export function useGameLogic() {
             }
           );
 
-        /**
-         * Se não acertou nada,
-         * mantém a bala.
-         */
+        // ----------------------------------------------------
+        // MANTÉM BALA SE NÃO ACERTOU
+        // ----------------------------------------------------
 
         if (!hit) {
+
           nextBullets.push({
             ...bullet,
             x: nx,
             y: ny,
           });
+
         }
       }
 
-      /**
-       * Atualiza ref das balas.
-       */
-
+      // Atualiza balas
       bulletsRef.current =
         nextBullets;
 
-      /**
-       * ========================================================
-       * SCORE EXTRA
-       * ========================================================
-       */
+      // ======================================================
+      // SCORE EXTRA
+      // ======================================================
 
       if (scoreBonus > 0) {
+
         scoreRef.current +=
           scoreBonus;
 
@@ -379,13 +318,12 @@ export function useGameLogic() {
         );
       }
 
-      /**
-       * ========================================================
-       * COMBO
-       * ========================================================
-       */
+      // ======================================================
+      // COMBO
+      // ======================================================
 
       if (comboIncrease > 0) {
+
         comboRef.current +=
           comboIncrease;
 
@@ -394,15 +332,14 @@ export function useGameLogic() {
         );
       }
 
-      /**
-       * ========================================================
-       * EXPLOSÕES
-       * ========================================================
-       */
+      // ======================================================
+      // EXPLOSÕES
+      // ======================================================
 
       if (
         newExplosions.length > 0
       ) {
+
         const updatedExplosions =
           [
             ...explosionsRef.current,
@@ -417,38 +354,32 @@ export function useGameLogic() {
         );
       }
 
-      /**
-       * ========================================================
-       * MOVIMENTO DOS OBSTÁCULOS
-       * ========================================================
-       */
+      // ======================================================
+      // 2. OBSTÁCULOS
+      // ======================================================
 
       nextObstacles =
         nextObstacles.map(
           (obstacle) => {
-            let nx = obstacle.x;
 
-            /**
-             * Movimento lateral.
-             */
+            // ------------------------------------------------
+            // MOVIMENTO HORIZONTAL
+            // ------------------------------------------------
 
-            if (obstacle.drift) {
-              nx =
-                obstacle.x +
-                Math.sin(
-                  tickRef.current *
-                    0.05 +
-                    obstacle.driftPhase
-                ) *
-                  1.5;
-            }
+            const nx =
+              obstacle.drift
+                ? obstacle.x +
+                  Math.sin(
+                    tickRef.current *
+                      0.05 +
+                      obstacle.driftPhase
+                  ) *
+                    1.5
+                : obstacle.x;
 
-            /**
-             * Movimento vertical.
-             *
-             * speedMult é o multiplicador
-             * global da dificuldade.
-             */
+            // ------------------------------------------------
+            // MOVIMENTO VERTICAL
+            // ------------------------------------------------
 
             const ny =
               obstacle.y +
@@ -456,28 +387,25 @@ export function useGameLogic() {
                 obstacle.speedMult *
                 speedMult;
 
-            /**
-             * ==================================================
-             * SAIU DA TELA
-             * ==================================================
-             */
+            // ------------------------------------------------
+            // SAIU DA TELA
+            // ------------------------------------------------
 
             if (
               ny >
               HEIGHT + 60
             ) {
+
               return randomObstacle(
                 obstacleId.current++
               );
             }
 
-            /**
-             * ==================================================
-             * COLISÃO COM PLAYER
-             * ==================================================
-             */
+            // ------------------------------------------------
+            // COLISÃO COM PLAYER
+            // ------------------------------------------------
 
-            if (
+            const hitPlayer =
               Math.abs(
                 nx -
                   playerRef.current.x
@@ -485,30 +413,32 @@ export function useGameLogic() {
               Math.abs(
                 ny -
                   playerRef.current.y
-              ) < 30
-            ) {
-              /**
-               * Só perde vida se não tiver shield.
-               */
+              ) < 30;
+
+            if (hitPlayer) {
+
+              // ----------------------------------------------
+              // SEM SHIELD
+              // ----------------------------------------------
 
               if (
                 !shieldRef.current
               ) {
-                livesRef.current -=
-                  1;
+
+                livesRef.current -= 1;
 
                 setLives(
                   livesRef.current
                 );
 
-                /**
-                 * Game Over.
-                 */
+                // --------------------------------------------
+                // GAME OVER
+                // --------------------------------------------
 
                 if (
-                  livesRef.current <=
-                  0
+                  livesRef.current <= 0
                 ) {
+
                   gameOverRef.current =
                     true;
 
@@ -516,18 +446,15 @@ export function useGameLogic() {
                 }
               }
 
-              /**
-               * Remove/reposiciona obstáculo.
-               */
-
+              // Reposiciona obstáculo
               return randomObstacle(
                 obstacleId.current++
               );
             }
 
-            /**
-             * Retorna obstáculo atualizado.
-             */
+            // ------------------------------------------------
+            // OBSTÁCULO ATUALIZADO
+            // ------------------------------------------------
 
             return {
               ...obstacle,
@@ -537,38 +464,31 @@ export function useGameLogic() {
           }
         );
 
-      /**
-       * Atualiza ref dos obstáculos.
-       */
-
       obstaclesRef.current =
         nextObstacles;
 
-      /**
-       * ========================================================
-       * COLETÁVEIS
-       * ========================================================
-       */
+      // ======================================================
+      // 3. COLETÁVEIS
+      // ======================================================
 
       const nextCollectibles =
         collectiblesRef.current.map(
           (collectible) => {
-            /**
-             * Movimento do coletável.
-             */
+
+            // ------------------------------------------------
+            // MOVIMENTO
+            // ------------------------------------------------
 
             const ny =
               collectible.y +
               collectible.speed *
                 speedMult;
 
-            /**
-             * ==================================================
-             * COLISÃO COM PLAYER
-             * ==================================================
-             */
+            // ------------------------------------------------
+            // COLISÃO
+            // ------------------------------------------------
 
-            if (
+            const hitPlayer =
               Math.abs(
                 collectible.x -
                   playerRef.current.x
@@ -576,15 +496,18 @@ export function useGameLogic() {
               Math.abs(
                 ny -
                   playerRef.current.y
-              ) < 35
-            ) {
-              /**
-               * GEM / SHIELD
-               */
+              ) < 35;
+
+            if (hitPlayer) {
+
+              // ----------------------------------------------
+              // ITEM ESPECIAL / GEM
+              // ----------------------------------------------
 
               if (
                 collectible.special
               ) {
+
                 setGems(
                   (g) => g + 1
                 );
@@ -595,26 +518,26 @@ export function useGameLogic() {
                 setShield(true);
 
                 setTimeout(() => {
+
                   shieldRef.current =
                     false;
 
                   setShield(false);
+
                 }, GAME_CONFIG.SHIELD_DURATION);
+
               }
 
-              /**
-               * MOEDA
-               */
+              // ----------------------------------------------
+              // MOEDA
+              // ----------------------------------------------
 
               else {
+
                 setCoins(
-                  (m) => m + 1
+                  (c) => c + 1
                 );
               }
-
-              /**
-               * Reposiciona coletável.
-               */
 
               return randomCoin(
                 collectibleId.current++,
@@ -622,25 +545,24 @@ export function useGameLogic() {
               );
             }
 
-            /**
-             * ==================================================
-             * COLETÁVEL SAIU DA TELA
-             * ==================================================
-             */
+            // ------------------------------------------------
+            // SAIU DA TELA
+            // ------------------------------------------------
 
             if (
               ny >
               HEIGHT + 60
             ) {
+
               return randomCoin(
                 collectibleId.current++,
                 collectible.special
               );
             }
 
-            /**
-             * Atualiza posição.
-             */
+            // ------------------------------------------------
+            // ATUALIZA
+            // ------------------------------------------------
 
             return {
               ...collectible,
@@ -649,23 +571,16 @@ export function useGameLogic() {
           }
         );
 
-      /**
-       * Atualiza ref.
-       */
-
       collectiblesRef.current =
         nextCollectibles;
 
-      /**
-       * ========================================================
-       * SINCRONIZA COM REACT
-       * ========================================================
-       *
-       * Aqui enviamos os resultados calculados
-       * pelo engine para os componentes visuais.
-       */
+      // ======================================================
+      // SINCRONIZA COM REACT
+      // ======================================================
 
-      setBullets(nextBullets);
+      setBullets(
+        nextBullets
+      );
 
       setObstacles(
         nextObstacles
@@ -674,147 +589,94 @@ export function useGameLogic() {
       setCollectibles(
         nextCollectibles
       );
+
     }, GAME_CONFIG.GAME_LOOP_INTERVAL);
 
-    /**
-     * Cleanup do loop.
-     */
+    // ========================================================
+    // CLEANUP
+    // ========================================================
 
     return () => {
       clearInterval(loop);
     };
+
   }, []);
 
-  /**
-   * ============================================================
-   * SHOOT
-   * ============================================================
-   */
+  // ==========================================================
+  // SHOOT
+  // ==========================================================
+  //
+  // UM TOQUE = UM DISPARO
+  //
+  // Não existe mais disparo automático.
+  // Não existe intervalo de tiro.
+  // ==========================================================
 
   function shoot() {
-    if (gameOverRef.current) {
+
+    if (
+      gameOverRef.current
+    ) {
       return;
     }
 
-    /**
-     * Usa playerRef em vez do estado player.
-     *
-     * Isso evita problema de closure stale.
-     */
-
-    const playerX =
-      playerRef.current.x;
-
-    const playerY =
-      playerRef.current.y;
+    const {
+      x,
+      y,
+    } = playerRef.current;
 
     const newBullets: Bullet[] = [
+
       ...bulletsRef.current,
 
       {
-        id: bulletId.current++,
-        x: playerX + 5,
-        y: playerY,
+        id:
+          bulletId.current++,
+
+        x:
+          x + 5,
+
+        y,
+
         vx: 0,
+
         vy: -14,
       },
 
       {
-        id: bulletId.current++,
-        x: playerX + 25,
-        y: playerY,
+        id:
+          bulletId.current++,
+
+        x:
+          x + 25,
+
+        y,
+
         vx: 0,
+
         vy: -14,
       },
     ];
 
-    /**
-     * Atualiza primeiro o engine.
-     */
-
+    // Atualiza engine
     bulletsRef.current =
       newBullets;
 
-    /**
-     * Depois o React.
-     */
-
-    setBullets(newBullets);
+    // Atualiza UI
+    setBullets(
+      newBullets
+    );
   }
 
-  /**
-   * ============================================================
-   * START SHOOTING
-   * ============================================================
-   */
-
-  function startShooting() {
-    if (gameOverRef.current) {
-      return;
-    }
-
-    /**
-     * Evita múltiplos intervals.
-     */
-
-    if (shootIntervalRef.current) {
-      clearInterval(
-        shootIntervalRef.current
-      );
-
-      shootIntervalRef.current =
-        null;
-    }
-
-    /**
-     * Primeiro tiro imediato.
-     */
-
-    shoot();
-
-    /**
-     * Depois tiros automáticos.
-     */
-
-    shootIntervalRef.current =
-      setInterval(() => {
-        if (
-          !gameOverRef.current
-        ) {
-          shoot();
-        }
-      }, GAME_CONFIG.SHOOT_INTERVAL);
-  }
-
-  /**
-   * ============================================================
-   * STOP SHOOTING
-   * ============================================================
-   */
-
-  function stopShooting() {
-    if (
-      shootIntervalRef.current
-    ) {
-      clearInterval(
-        shootIntervalRef.current
-      );
-
-      shootIntervalRef.current =
-        null;
-    }
-  }
-
-  /**
-   * ============================================================
-   * RESTART GAME
-   * ============================================================
-   */
+  // ==========================================================
+  // RESTART GAME
+  // ==========================================================
 
   function restartGame() {
-    /**
-     * Cria objetos iniciais.
-     */
+
+    // --------------------------------------------------------
+    // NOVOS OBJETOS
+    // --------------------------------------------------------
 
     const initialObstacles =
       createInitialObstacles(
@@ -824,11 +686,19 @@ export function useGameLogic() {
     const initialCollectibles =
       createInitialCollectibles();
 
-    /**
-     * ========================================================
-     * RESET DOS REFS
-     * ========================================================
-     */
+    // --------------------------------------------------------
+    // POSIÇÃO INICIAL
+    // --------------------------------------------------------
+
+    const startX =
+      WIDTH * 0.5;
+
+    const startY =
+      HEIGHT * 0.8;
+
+    // ========================================================
+    // RESET REFS
+    // ========================================================
 
     scoreRef.current = 0;
 
@@ -852,23 +722,33 @@ export function useGameLogic() {
     collectiblesRef.current =
       initialCollectibles;
 
-    /**
-     * ========================================================
-     * RESET DO REACT
-     * ========================================================
-     */
+    playerRef.current = {
+      x: startX,
+      y: startY,
+    };
+
+    // ========================================================
+    // RESET STATES
+    // ========================================================
 
     setScore(0);
+
     setCoins(0);
+
     setGems(0);
+
     setCombo(0);
+
     setLives(3);
 
     setShield(false);
+
     setGameOver(false);
 
     setBullets([]);
+
     setExplosions([]);
+
     setTrail([]);
 
     setObstacles(
@@ -879,74 +759,41 @@ export function useGameLogic() {
       initialCollectibles
     );
 
-    /**
-     * ========================================================
-     * RESET PLAYER
-     * ========================================================
-     */
-
-    const startX =
-      WIDTH * 0.5;
-
-    const startY =
-      HEIGHT * 0.8;
-
-    playerRef.current = {
-      x: startX,
-      y: startY,
-    };
-
     setPlayer({
       x: startX,
       y: startY,
       angle: 0,
     });
-
-    /**
-     * ========================================================
-     * PARA DISPARO ANTERIOR
-     * ========================================================
-     */
-
-    if (
-      shootIntervalRef.current
-    ) {
-      clearInterval(
-        shootIntervalRef.current
-      );
-
-      shootIntervalRef.current =
-        null;
-    }
   }
 
-  /**
-   * ============================================================
-   * UPDATE PLAYER
-   * ============================================================
-   */
+  // ==========================================================
+  // UPDATE PLAYER
+  // ==========================================================
 
   function updatePlayerPosition(
     x: number,
     y: number,
     angle: number
   ) {
-    if (gameOverRef.current) {
+
+    if (
+      gameOverRef.current
+    ) {
       return;
     }
 
-    /**
-     * Atualiza posição interna.
-     */
+    // --------------------------------------------------------
+    // ENGINE
+    // --------------------------------------------------------
 
     playerRef.current = {
       x,
       y,
     };
 
-    /**
-     * Atualiza visual.
-     */
+    // --------------------------------------------------------
+    // UI
+    // --------------------------------------------------------
 
     setPlayer({
       x,
@@ -954,36 +801,43 @@ export function useGameLogic() {
       angle,
     });
 
-    /**
-     * Atualiza rastro.
-     */
+    // --------------------------------------------------------
+    // TRAIL
+    // --------------------------------------------------------
 
-    setTrail((prev) => {
-      const newTrail = [
-        {
-          id: trailId.current++,
-          x,
-          y,
-        },
-        ...prev,
-      ];
+    setTrail(
+      (prev) => {
 
-      return newTrail.slice(0, 6);
-    });
+        const newTrail = [
+          {
+            id:
+              trailId.current++,
+            x,
+            y,
+          },
+          ...prev,
+        ];
+
+        return newTrail.slice(
+          0,
+          6
+        );
+      }
+    );
   }
 
-  /**
-   * ============================================================
-   * RETORNO
-   * ============================================================
-   */
+  // ==========================================================
+  // RETORNO
+  // ==========================================================
 
   return {
+
     score,
     coins,
     gems,
     combo,
     lives,
+
     gameOver,
     shield,
 
@@ -992,11 +846,14 @@ export function useGameLogic() {
     trail,
     obstacles,
     collectibles,
+
     player,
 
-    shoot: startShooting,
-    stopShooting,
+    // UM TOQUE = UM TIRO
+    shoot,
+
     restartGame,
+
     updatePlayerPosition,
 
     setGameOver,
