@@ -1,0 +1,49 @@
+name: Build APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Project
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Generate Android Project
+        run: npx expo prebuild --platform android --clean --non-interactive
+
+      - name: Ensure gradlew is executable
+        run: chmod +x android/gradlew
+
+      - name: Clean & refresh Gradle deps
+        working-directory: android
+        run: ./gradlew --no-daemon clean --refresh-dependencies
+
+      - name: Build APK
+        working-directory: android
+        run: |
+          ./gradlew assembleRelease --stacktrace --no-daemon
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: Interestrelar-APK
+          path: android/app/build/outputs/apk/release/app-release.apk

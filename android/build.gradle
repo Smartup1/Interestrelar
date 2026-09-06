@@ -1,0 +1,57 @@
+// Top-level build file where you can add configuration options common to all sub-projects/modules.
+
+buildscript {
+  repositories {
+    google()
+    mavenCentral()
+  }
+  // Fix: explicitar a versão Kotlin usada por todo o projeto
+  ext {
+    kotlinVersion = '1.9.10' // ajuste se precisar de outra 1.9.x
+  }
+  dependencies {
+    classpath('com.facebook.react:react-native-gradle-plugin')
+    // Use a versão fixada do plugin Kotlin
+    classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:${kotlinVersion}")
+  }
+}
+
+allprojects {
+  repositories {
+    google()
+    mavenCentral()
+    maven { url 'https://www.jitpack.io' }
+  }
+}
+
+/* --- adicione este bloco para uniformizar opções Kotlin e forçar versões --- */
+subprojects {
+    afterEvaluate { proj ->
+        // Aplica jvmTarget consistente para todas as tasks Kotlin
+        proj.tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
+            kotlinOptions {
+                jvmTarget = "17"
+                freeCompilerArgs += ["-Xjvm-default=all-compatibility"]
+            }
+        }
+    }
+
+    // Força dependências org.jetbrains.kotlin para a versão declarada (evita misturas)
+    configurations.all {
+        resolutionStrategy.eachDependency { details ->
+            if (details.requested.group == 'org.jetbrains.kotlin') {
+                details.useVersion kotlinVersion
+            }
+            // Força versão do Google Mobile Ads SDK que expõe AgeRestrictedTreatment
+            if (details.requested.group == 'com.google.android.gms' &&
+                details.requested.name == 'play-services-ads') {
+                // Ajuste a versão aqui se preferir (ex.: '21.0.0' ou outra compatível)
+                details.useVersion '21.0.0'
+                details.because 'Garantir API AgeRestrictedTreatment usada por react-native-google-mobile-ads'
+            }
+        }
+    }
+}
+
+apply plugin: "expo-root-project"
+apply plugin: "com.facebook.react.rootproject"
