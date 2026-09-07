@@ -1,5 +1,6 @@
 // src/hooks/useTiltControl.tsx
 import { useEffect, useRef } from "react";
+import { Platform } from "react-native";
 import { Accelerometer } from "expo-sensors";
 
 export interface TiltValue {
@@ -39,32 +40,42 @@ export function useTiltControl({
       return;
     }
 
-    Accelerometer.setUpdateInterval(updateIntervalMs);
+    if (Platform.OS === "web") return;
 
-    const subscription = Accelerometer.addListener(({ x, y }) => {
-      // Calibra na primeira leitura: essa posição vira o "neutro",
-      // assim o jogador não precisa segurar o celular perfeitamente na vertical.
-      if (!baselineRef.current) {
-        baselineRef.current = { x, y };
-      }
+    let subscription: { remove: () => void } | null = null;
+    let cancelled = false;
 
-      const rawX = x - baselineRef.current.x;
-      const rawY = y - baselineRef.current.y;
+    Accelerometer.isAvailableAsync().then((available) => {
+      if (!available || cancelled) return;
 
-      // Suavização (low-pass filter) para tirar tremida/ruído do sensor
-      smoothedRef.current = {
-        x: smoothedRef.current.x + (rawX - smoothedRef.current.x) * (1 - smoothing),
-        y: smoothedRef.current.y + (rawY - smoothedRef.current.y) * (1 - smoothing),
-      };
+      Accelerometer.setUpdateInterval(updateIntervalMs);
 
-      tiltRef.current = {
-        x: smoothedRef.current.x,
-        y: smoothedRef.current.y,
-      };
+      subscription = Accelerometer.addListener(({ x, y }) => {
+        // Calibra na primeira leitura: essa posição vira o "neutro",
+        // assim o jogador não precisa segurar o celular perfeitamente na vertical.
+        if (!baselineRef.current) {
+          baselineRef.current = { x, y };
+        }
+
+        const rawX = x - baselineRef.current.x;
+        const rawY = y - baselineRef.current.y;
+
+        // Suavização (low-pass filter) para tirar tremida/ruído do sensor
+        smoothedRef.current = {
+          x: smoothedRef.current.x + (rawX - smoothedRef.current.x) * (1 - smoothing),
+          y: smoothedRef.current.y + (rawY - smoothedRef.current.y) * (1 - smoothing),
+        };
+
+        tiltRef.current = {
+          x: smoothedRef.current.x,
+          y: smoothedRef.current.y,
+        };
+      });
     });
 
     return () => {
-      subscription.remove();
+      cancelled = true;
+      subscription?.remove();
       baselineRef.current = null;
     };
   }, [enabled, updateIntervalMs, smoothing]);

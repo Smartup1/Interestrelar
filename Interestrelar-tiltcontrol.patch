@@ -1,0 +1,150 @@
+diff --git a/src/components/Game/GameIndex.tsx b/src/components/Game/GameIndex.tsx
+index feebd52..4cc61ea 100644
+--- a/src/components/Game/GameIndex.tsx
++++ b/src/components/Game/GameIndex.tsx
+@@ -10,7 +10,7 @@ import { useSounds } from "../../utils/useSounds";
+ import { createPulseAnimation } from "../../utils/animations";
+ import { WIDTH, HEIGHT, GAME_CONFIG } from "../../constants/gameConfig";
+ import { useDailyCredits } from "../../hooks/useDailyCredits";
+-import { useTiltSteering } from "../../hooks/useTiltSteering";
++import { useTiltControl } from "../../hooks/useTiltControl";
+ import styles from "./styles";
+ 
+ export default function Game() {
+@@ -59,8 +59,8 @@ export default function Game() {
+     playerRef2.current = player;
+   }, [player]);
+ 
+-  // Controle por inclinação do celular
+-  const tiltX = useTiltSteering();
++  // Controle por inclinação do celular (calibra a posição neutra a cada partida)
++  const tiltRef = useTiltControl({ enabled: !gameOver });
+   const isDraggingRef = useRef(false);
+ 
+   const prevExplosionsLen = useRef(0);
+@@ -105,7 +105,7 @@ export default function Game() {
+     const interval = setInterval(() => {
+       if (gameOverRef.current) return;
+ 
+-      const tilt = tiltX.current;
++      const tilt = tiltRef.current.x;
+       if (Math.abs(tilt) < DEAD_ZONE) return;
+ 
+       const current = playerRef2.current;
+diff --git a/src/hooks/useTiltControl.tsx b/src/hooks/useTiltControl.tsx
+index 95b98e2..16d0a9f 100644
+--- a/src/hooks/useTiltControl.tsx
++++ b/src/hooks/useTiltControl.tsx
+@@ -1,5 +1,6 @@
+ // src/hooks/useTiltControl.tsx
+ import { useEffect, useRef } from "react";
++import { Platform } from "react-native";
+ import { Accelerometer } from "expo-sensors";
+ 
+ export interface TiltValue {
+@@ -39,32 +40,42 @@ export function useTiltControl({
+       return;
+     }
+ 
+-    Accelerometer.setUpdateInterval(updateIntervalMs);
++    if (Platform.OS === "web") return;
+ 
+-    const subscription = Accelerometer.addListener(({ x, y }) => {
+-      // Calibra na primeira leitura: essa posição vira o "neutro",
+-      // assim o jogador não precisa segurar o celular perfeitamente na vertical.
+-      if (!baselineRef.current) {
+-        baselineRef.current = { x, y };
+-      }
++    let subscription: { remove: () => void } | null = null;
++    let cancelled = false;
+ 
+-      const rawX = x - baselineRef.current.x;
+-      const rawY = y - baselineRef.current.y;
++    Accelerometer.isAvailableAsync().then((available) => {
++      if (!available || cancelled) return;
+ 
+-      // Suavização (low-pass filter) para tirar tremida/ruído do sensor
+-      smoothedRef.current = {
+-        x: smoothedRef.current.x + (rawX - smoothedRef.current.x) * (1 - smoothing),
+-        y: smoothedRef.current.y + (rawY - smoothedRef.current.y) * (1 - smoothing),
+-      };
++      Accelerometer.setUpdateInterval(updateIntervalMs);
+ 
+-      tiltRef.current = {
+-        x: smoothedRef.current.x,
+-        y: smoothedRef.current.y,
+-      };
++      subscription = Accelerometer.addListener(({ x, y }) => {
++        // Calibra na primeira leitura: essa posição vira o "neutro",
++        // assim o jogador não precisa segurar o celular perfeitamente na vertical.
++        if (!baselineRef.current) {
++          baselineRef.current = { x, y };
++        }
++
++        const rawX = x - baselineRef.current.x;
++        const rawY = y - baselineRef.current.y;
++
++        // Suavização (low-pass filter) para tirar tremida/ruído do sensor
++        smoothedRef.current = {
++          x: smoothedRef.current.x + (rawX - smoothedRef.current.x) * (1 - smoothing),
++          y: smoothedRef.current.y + (rawY - smoothedRef.current.y) * (1 - smoothing),
++        };
++
++        tiltRef.current = {
++          x: smoothedRef.current.x,
++          y: smoothedRef.current.y,
++        };
++      });
+     });
+ 
+     return () => {
+-      subscription.remove();
++      cancelled = true;
++      subscription?.remove();
+       baselineRef.current = null;
+     };
+   }, [enabled, updateIntervalMs, smoothing]);
+diff --git a/src/hooks/useTiltSteering.tsx b/src/hooks/useTiltSteering.tsx
+deleted file mode 100644
+index aea203a..0000000
+--- a/src/hooks/useTiltSteering.tsx
++++ /dev/null
+@@ -1,37 +0,0 @@
+-import { useEffect, useRef } from "react";
+-import { Platform } from "react-native";
+-import { Accelerometer } from "expo-sensors";
+-
+-/**
+- * Lê o acelerômetro do celular e devolve uma ref com a inclinação lateral
+- * suavizada, de aproximadamente -1 (inclinado pra esquerda) a 1 (pra direita).
+- *
+- * Não funciona no navegador (web) — nesse caso a ref fica sempre em 0,
+- * o que não afeta o controle por toque.
+- */
+-export function useTiltSteering() {
+-  const tiltX = useRef(0);
+-
+-  useEffect(() => {
+-    if (Platform.OS === "web") return;
+-
+-    let subscription: { remove: () => void } | null = null;
+-
+-    Accelerometer.isAvailableAsync().then((available) => {
+-      if (!available) return;
+-
+-      Accelerometer.setUpdateInterval(50); // ~20 leituras por segundo
+-
+-      subscription = Accelerometer.addListener(({ x }) => {
+-        // Suaviza com média móvel simples para não tremer (jitter do sensor)
+-        tiltX.current = tiltX.current * 0.8 + x * 0.2;
+-      });
+-    });
+-
+-    return () => {
+-      subscription?.remove();
+-    };
+-  }, []);
+-
+-  return tiltX;
+-}
+\ No newline at end of file

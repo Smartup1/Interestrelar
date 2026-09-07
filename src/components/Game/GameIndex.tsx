@@ -10,7 +10,7 @@ import { useSounds } from "../../utils/useSounds";
 import { createPulseAnimation } from "../../utils/animations";
 import { WIDTH, HEIGHT, GAME_CONFIG } from "../../constants/gameConfig";
 import { useDailyCredits } from "../../hooks/useDailyCredits";
-import { useTiltSteering } from "../../hooks/useTiltSteering";
+import { useTiltControl } from "../../hooks/useTiltControl";
 import styles from "./styles";
 
 export default function Game() {
@@ -59,8 +59,8 @@ export default function Game() {
     playerRef2.current = player;
   }, [player]);
 
-  // Controle por inclinação do celular
-  const tiltX = useTiltSteering();
+  // Controle por inclinação do celular (calibra a posição neutra a cada partida)
+  const tiltRef = useTiltControl({ enabled: !gameOver });
   const isDraggingRef = useRef(false);
 
   const prevExplosionsLen = useRef(0);
@@ -105,7 +105,7 @@ export default function Game() {
     const interval = setInterval(() => {
       if (gameOverRef.current) return;
 
-      const tilt = tiltX.current;
+      const tilt = tiltRef.current.x;
       if (Math.abs(tilt) < DEAD_ZONE) return;
 
       const current = playerRef2.current;
