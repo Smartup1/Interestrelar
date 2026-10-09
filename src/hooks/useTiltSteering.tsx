@@ -3,20 +3,22 @@
 import { useEffect, useRef } from "react";
 import { Platform } from "react-native";
 import { Accelerometer } from "expo-sensors";
+import { GAME_CONFIG } from "../constants/gameConfig";
 
 /**
  * Controle da nave exclusivamente pelo acelerômetro.
  *
- * tiltX.current:
+ * Devolve uma ref (tiltX.current) com valor de -1 a 1:
  *   negativo = inclinação para um lado
  *   positivo = inclinação para o outro lado
  *
- * O valor é calibrado automaticamente quando o jogo começa.
+ * Calibração: a primeira leitura depois que o sensor é ligado vira a
+ * posição neutra. Como o sensor liga/desliga conforme `enabled`, o jogo
+ * é recalibrado a cada nova partida (passe `!gameOver`).
  *
- * O TOUCH NÃO controla a nave.
- * O toque deve ser utilizado somente para disparar.
+ * O TOUCH NÃO controla a nave; serve somente para disparar.
  */
-export function useTiltSteering() {
+export function useTiltSteering(enabled: boolean = true) {
   const tiltX = useRef(0);
 
   // Posição neutra do celular no momento em que o sensor é iniciado
@@ -26,86 +28,70 @@ export function useTiltSteering() {
   const smoothedX = useRef(0);
 
   useEffect(() => {
+    baselineX.current = null;
+    smoothedX.current = 0;
+    tiltX.current = 0;
+
     // Sensor não funciona no navegador
-    if (Platform.OS === "web") {
-      tiltX.current = 0;
-      return;
-    }
+    if (Platform.OS === "web" || !enabled) return;
+
+    const {
+      TILT_UPDATE_INTERVAL,
+      TILT_SMOOTHING_ALPHA,
+      TILT_DEADZONE,
+      TILT_MAX_TILT,
+      TILT_INVERT_X,
+    } = GAME_CONFIG;
 
     let subscription: { remove: () => void } | null = null;
     let mounted = true;
-
+// Calibra com a média das primeiras leituras (mais estável que uma só)
+    const CALIBRATION_SAMPLES = 10;
+    let calibSum = 0;
+    let calibCount = 0;
     const startSensor = async () => {
       try {
         const available = await Accelerometer.isAvailableAsync();
+        if (!available || !mounted) return;
 
-        if (!available || !mounted) {
-          return;
-        }
-
-        // Aproximadamente 20 leituras por segundo
-        Accelerometer.setUpdateInterval(50);
+        Accelerometer.setUpdateInterval(TILT_UPDATE_INTERVAL);
 
         subscription = Accelerometer.addListener(({ x }) => {
           if (!mounted) return;
 
-          /*
-           * Primeira leitura:
-           * considera a posição atual do celular como posição neutra.
-           */
+          // Primeiras leituras: a média delas vira a posição neutra.
           if (baselineX.current === null) {
-            baselineX.current = x;
-            smoothedX.current = 0;
-            tiltX.current = 0;
+            calibSum += x;
+            calibCount += 1;
+            if (calibCount >= CALIBRATION_SAMPLES) {
+              baselineX.current = calibSum / calibCount;
+            }
             return;
           }
+          const diff = x - baselineX.current;
 
-          /*
-           * Diferença em relação à posição neutra.
-           */
-          let rawX = x - baselineX.current;
+          // Zona morta contínua: abaixo do limite vale 0 e, acima, o valor
+          // cresce a partir de 0 (sem "pulo" ao sair da zona morta).
+          const rawX =
+            Math.abs(diff) < TILT_DEADZONE
+              ? 0
+              : diff - Math.sign(diff) * TILT_DEADZONE;
 
-          /*
-           * Zona morta.
-           *
-           * Evita que pequenas vibrações façam a nave se movimentar.
-           */
-          const DEAD_ZONE = 0.04;
-
-          if (Math.abs(rawX) < DEAD_ZONE) {
-            rawX = 0;
-          }
-
-          /*
-           * Suavização.
-           *
-           * Quanto maior o segundo valor,
-           * mais rápido o controle responde.
-           */
+          // Suavização: quanto maior o alpha, mais rápido responde.
           smoothedX.current =
-            smoothedX.current * 0.75 +
-            rawX * 0.25;
+            smoothedX.current * (1 - TILT_SMOOTHING_ALPHA) +
+            rawX * TILT_SMOOTHING_ALPHA;
 
-          /*
-           * Limita o valor para evitar velocidades exageradas.
-           */
-          const MAX_TILT = 0.7;
-
+          // Normaliza para -1..1
           const normalized = Math.max(
             -1,
-            Math.min(
-              1,
-              smoothedX.current / MAX_TILT
-            )
+            Math.min(1, smoothedX.current / (TILT_MAX_TILT - TILT_DEADZONE))
           );
 
-          tiltX.current = normalized;
+          tiltX.current = normalized * TILT_INVERT_X;
         });
       } catch (error) {
-        console.warn(
-          "Erro ao iniciar acelerômetro:",
-          error
-        );
+        console.warn("Erro ao iniciar acelerômetro:", error);
       }
     };
 
@@ -113,15 +99,13 @@ export function useTiltSteering() {
 
     return () => {
       mounted = false;
-
       subscription?.remove();
       subscription = null;
-
       baselineX.current = null;
       smoothedX.current = 0;
       tiltX.current = 0;
     };
-  }, []);
+  }, [enabled]);
 
   return tiltX;
 }

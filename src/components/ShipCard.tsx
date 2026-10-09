@@ -3,6 +3,7 @@ import React, {
 } from "react";
 
 import {
+  Image,
   Pressable,
   StyleSheet,
   Text,
@@ -33,7 +34,7 @@ function ShipCard({
           ? onSelect
           : undefined
       }
-      style={[
+            style={[
         styles.card,
 
         selected &&
@@ -44,20 +45,25 @@ function ShipCard({
       ]}
     >
       <View style={styles.shipIcon}>
-        <Text style={styles.emoji}>
-          {unlocked
-            ? ship.emoji
-            : "🔒"}
-        </Text>
+        {unlocked && ship.image ? (
+          <Image
+            source={ship.image}
+            style={{ width: 30, height: 54 }}
+            resizeMode="contain"
+          />
+        ) : (
+          <Text style={styles.emoji}>
+            {unlocked ? ship.emoji : "🔒"}
+          </Text>
+        )}
       </View>
 
       <View
-        style={styles.info}
-      >
+        style={styles.info}>
         <Text style={styles.name}>
           {ship.name}
         </Text>
-
+		
         {unlocked ? (
           <Text
             style={

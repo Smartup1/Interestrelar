@@ -6,7 +6,7 @@ import {
 } from "react-native";
 
 import { useRouter } from "expo-router";
-
+import { useShips } from "../../hooks/useShips";
 import Player from "../Player";
 import HUD from "../HUD";
 import GameModal from "../GameModal/GameModal";
@@ -33,7 +33,7 @@ export default function Game() {
   // ============================================================
 
   const router = useRouter();
-
+  const { selectedShip } = useShips();
   // ============================================================
   // CRÉDITOS
   // ============================================================
@@ -143,7 +143,7 @@ export default function Game() {
   // ============================================================
 
   const tiltX =
-    useTiltSteering();
+    useTiltSteering(!gameOver);
 
   // ============================================================
   // MOVIMENTO PELO SENSOR
@@ -154,8 +154,8 @@ export default function Game() {
   // ============================================================
 
   useEffect(() => {
-    const TILT_SENSITIVITY = 7;
-    const MAX_BANK_ANGLE = 35;
+    const TILT_SENSITIVITY = GAME_CONFIG.TILT_SENSITIVITY;
+    const MAX_BANK_ANGLE = GAME_CONFIG.TILT_MAX_BANK_ANGLE;
 
     const interval =
       setInterval(() => {
@@ -180,7 +180,7 @@ export default function Game() {
           Math.max(
             0,
             Math.min(
-              WIDTH - 90,
+              WIDTH - 60,
               current.x -
                 tilt *
                   TILT_SENSITIVITY
@@ -416,12 +416,11 @@ export default function Game() {
           }}
         >
           <Player
-            x={0}
-            y={0}
-            angle={
-              player.angle
-            }
-          />
+			  x={0}
+			  y={0}
+			  angle={player.angle}
+			  image={selectedShip?.image}
+		   />
         </View>
 
         {/* ====================================================
