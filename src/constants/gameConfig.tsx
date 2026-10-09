@@ -38,12 +38,25 @@ export const GAME_CONFIG = {
   PLAYER_MIN_Y: 70,              // a nave não sobe para baixo da barra do topo (HUD)
   PLAYER_FINGER_LIFT: 70,        // a nave fica acima do dedo para ele não cobrir a nave
 
+  // Manobrabilidade da nave (ela "voa" até o dedo, não teletransporta)
+  SHIP_STIFFNESS: 12,            // maior = alcança o dedo mais rápido (6 = lenta, 20 = quase colada)
+  SHIP_MAX_SPEED_X: 600,         // velocidade máxima de LADO, em px/s  (menor = anda menos de lado)
+  SHIP_MAX_SPEED_Y: 800,         // velocidade máxima para CIMA/BAIXO, em px/s
+  LATERAL_CURVE: 1.4,            // 1 = dedo e nave andam iguais; maior = controle mais fino perto do centro
+                                 // (a nave ainda chega nas bordas da tela)
+  TAP_MOVE_THRESHOLD: 8,         // movimento mínimo do dedo (px) para contar como arrastar e não como toque
+
+  // Rotação da ponta
+  SHIP_TURN_RATE: 9,             // maior = a ponta vira mais rápido
+  SHIP_MIN_TURN_SPEED: 140,      // abaixo dessa velocidade (px/s) a ponta volta para cima
+  SHIP_MAX_TURN: 180,            // 180 = vira para todos os lados; 60 = no máximo 60° para cada lado
+
   // Nível de tiro (estilo Aero Fighters)
   MAX_WEAPON_LEVEL: 5,           // nível máximo do tiro
   POWERUP_DROP_CHANCE: 0.12,     // chance de um inimigo destruído soltar o "P"
   POWERUP_SPAWN_TICKS: 480,      // sem "P" por esse tempo (~29s) = cai um sozinho
-  SHOT_COOLDOWN_TICKS: 2,        // intervalo mínimo entre tiros (2 ticks ≈ 120ms)
-  MAX_BULLETS: 48,               // limite de tiros na tela (desempenho)
+  SHOT_COOLDOWN_TICKS: 3,        // intervalo mínimo entre tiros (3 ticks ≈ 180ms)
+  MAX_BULLETS: 40,               // limite de tiros na tela (desempenho)
   PLAYER_INVULN_TICKS: 20,       // invulnerável após tomar dano (~1,2s)
 
   // Chefão

@@ -637,7 +637,7 @@ export function useGameLogic() {
         const updated = [
           ...explosionsRef.current,
           ...newExplosions,
-        ].slice(-10);
+        ].slice(-6);
 
         explosionsRef.current = updated;
         setExplosions(updated);
@@ -690,7 +690,7 @@ export function useGameLogic() {
       x: cx + ox,
       y,
       vx,
-      vy: -14,
+      vy: -20,
     }));
 
     const all = [...bulletsRef.current, ...created].slice(
@@ -762,7 +762,19 @@ export function useGameLogic() {
   }
 
   // ==========================================================
-  // UPDATE PLAYER
+  // MOVE PLAYER (só a engine: NÃO redesenha a tela)
+  //
+  // A nave é desenhada fora do React (Animated), então mover a
+  // nave não custa nenhuma renderização.
+  // ==========================================================
+
+  function movePlayer(x: number, y: number) {
+    if (gameOverRef.current) return;
+    playerRef.current = { x, y };
+  }
+
+  // ==========================================================
+  // UPDATE PLAYER (antigo: redesenha a tela; mantido por compatibilidade)
   // ==========================================================
 
   function updatePlayerPosition(
@@ -815,6 +827,7 @@ export function useGameLogic() {
 
     shoot,
     restartGame,
+    movePlayer,
     updatePlayerPosition,
 
     setGameOver,

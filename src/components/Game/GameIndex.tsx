@@ -10,7 +10,7 @@ import { useShips } from "../../hooks/useShips";
 import Player from "../Player";
 import HUD from "../HUD";
 import GameModal from "../GameModal/GameModal";
-import GameRenderer from "./GameRenderer";
+import GameRenderer, { ShieldEffect } from "./GameRenderer";
 
 import { useGameLogic } from "./GameLogic";
 import { useSounds } from "../../utils/useSounds";
@@ -27,6 +27,8 @@ import { submitScore } from "../../services/ranking";
 import { Text } from "react-native";
 
 import styles from "./styles";
+
+const EMPTY_TRAIL: never[] = [];
 
 export default function Game() {
   // ============================================================
@@ -74,7 +76,7 @@ export default function Game() {
 
     shoot,
     restartGame,
-    updatePlayerPosition,
+    movePlayer,
   } = useGameLogic();
 
   // ============================================================
@@ -260,6 +262,7 @@ export default function Game() {
 
       // Reinicia o jogo
       restartGame();
+      resetMotion();
 
       // Retoma música
       resumeBackground();
@@ -286,20 +289,39 @@ export default function Game() {
   const handleShootRef = useRef(handleShoot);
   handleShootRef.current = handleShoot;
 
-  const lastApply = useRef({ t: 0, x: 0, y: 0 });
-  const followOffset = useRef({ x: 0, y: 0 });
-  const angleRef = useRef(0);
-  const easeTimer = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  // Tamanho REAL da área do jogo (medido na tela). Começa com o
-  // valor de gameConfig e é corrigido no onLayout do container.
-  const screenSize = useRef({ w: WIDTH, h: HEIGHT });
+  // ============================================================
+  // MOVIMENTO DA NAVE
+  //
+  // O dedo só define um ALVO. Um loop (~60 fps) faz a nave "voar"
+  // até o alvo, com mola + limite de velocidade, e move a nave com
+  // Animated, SEM redesenhar o jogo inteiro. Por isso fica leve.
+  // Os números de ajuste estão em gameConfig.tsx (SHIP_*).
+  // ============================================================
 
   const BOX = GAME_CONFIG.PLAYER_BOX;
   const HALF_BOX = BOX / 2;
-  // A caixa da nave é maior que a nave: esta folga deixa a ponta da
-  // asa encostar na borda da tela dos dois lados.
+  // Folga para a ponta da asa encostar na borda da tela dos dois lados
   const SIDE_MARGIN = (BOX - GAME_CONFIG.PLAYER_BODY_WIDTH) / 2;
+
+  const startX = WIDTH * 0.5 - HALF_BOX;
+  const startY = HEIGHT * 0.8;
+
+  const shipPos = useRef(
+    new Animated.ValueXY({ x: startX, y: startY })
+  ).current;
+  const shipAngle = useRef(new Animated.Value(0)).current;
+
+  const motion = useRef({
+    x: startX,
+    y: startY,
+    tx: startX,
+    ty: startY,
+    angle: 0,
+    dragging: false,
+  }).current;
+
+  // Tamanho REAL da área do jogo (medido no layout do container)
+  const screenSize = useRef({ w: WIDTH, h: HEIGHT });
 
   const clampX = (x: number) =>
     Math.max(
@@ -313,44 +335,98 @@ export default function Game() {
       Math.min(screenSize.current.h - BOX, y)
     );
 
-  const stopEase = () => {
-    if (easeTimer.current) {
-      clearInterval(easeTimer.current);
-      easeTimer.current = null;
-    }
+  const resetMotion = () => {
+    motion.x = startX;
+    motion.y = startY;
+    motion.tx = startX;
+    motion.ty = startY;
+    motion.angle = 0;
+    motion.dragging = false;
+    shipPos.setValue({ x: startX, y: startY });
+    shipAngle.setValue(0);
+    movePlayer(startX, startY);
   };
 
-  // Ao soltar o dedo, a ponta volta suavemente para cima
-  const easeToUpright = () => {
-    stopEase();
-    easeTimer.current = setInterval(() => {
-      if (gameOverRef.current) {
-        stopEase();
-        return;
-      }
-      angleRef.current *= 0.55;
-      if (Math.abs(angleRef.current) < 2) {
-        angleRef.current = 0;
-        stopEase();
-      }
-      const c = playerRef.current;
-      updatePlayerPosition(c.x, c.y, angleRef.current);
-    }, 40);
+  // Posição-alvo da nave para um dedo em (fx, fy).
+  // LATERAL_CURVE > 1 deixa o controle mais fino perto do centro
+  // (anda menos de lado), mas a nave ainda chega nas bordas.
+  const toTarget = (fx: number, fy: number) => {
+    const w = screenSize.current.w;
+    const u = Math.max(-1, Math.min(1, (fx - w / 2) / (w / 2)));
+    const cu =
+      Math.sign(u) * Math.pow(Math.abs(u), GAME_CONFIG.LATERAL_CURVE);
+    const cx = w / 2 + cu * (w / 2);
+
+    return {
+      x: clampX(cx - HALF_BOX),
+      y: clampY(fy - GAME_CONFIG.PLAYER_FINGER_LIFT - HALF_BOX),
+    };
   };
 
-  useEffect(() => () => stopEase(), []);
+  // Loop de movimento (não usa React state)
+  useEffect(() => {
+    let raf = 0;
+    let last = Date.now();
 
-  // Posição da nave para um dedo em (fx, fy): a nave fica CENTRADA
-  // no dedo (e um pouco acima, para o dedo não cobrir a nave).
-  // Como segue o dedo na tela inteira, ela alcança qualquer ponto,
-  // inclusive as bordas direita e esquerda.
-  const targetFor = (fx: number, fy: number) => ({
-    x: clampX(fx - HALF_BOX + followOffset.current.x),
-    y: clampY(
-      fy - GAME_CONFIG.PLAYER_FINGER_LIFT - HALF_BOX +
-        followOffset.current.y
-    ),
-  });
+    const {
+      SHIP_STIFFNESS,
+      SHIP_MAX_SPEED_X,
+      SHIP_MAX_SPEED_Y,
+      SHIP_TURN_RATE,
+      SHIP_MIN_TURN_SPEED,
+      SHIP_MAX_TURN,
+    } = GAME_CONFIG;
+
+    const frame = () => {
+      const now = Date.now();
+      const dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
+
+      if (!gameOverRef.current && dt > 0) {
+        const m = motion;
+
+        // Velocidade proporcional à distância do alvo (mola),
+        // com limite de velocidade (lado menor que cima/baixo)
+        const vx = Math.max(
+          -SHIP_MAX_SPEED_X,
+          Math.min(SHIP_MAX_SPEED_X, (m.tx - m.x) * SHIP_STIFFNESS)
+        );
+        const vy = Math.max(
+          -SHIP_MAX_SPEED_Y,
+          Math.min(SHIP_MAX_SPEED_Y, (m.ty - m.y) * SHIP_STIFFNESS)
+        );
+
+        m.x += vx * dt;
+        m.y += vy * dt;
+
+        // A ponta aponta para onde a nave está indo (0° = cima,
+        // 90° = direita, 180° = baixo, -90° = esquerda). Parada,
+        // ela volta suavemente para cima.
+        const speed = Math.hypot(vx, vy);
+
+        if (speed > SHIP_MIN_TURN_SPEED) {
+          let target = Math.atan2(vx, -vy) * (180 / Math.PI);
+          target = Math.max(-SHIP_MAX_TURN, Math.min(SHIP_MAX_TURN, target));
+
+          // caminho mais curto até o ângulo novo
+          const diff = ((target - m.angle + 540) % 360) - 180;
+          m.angle += diff * Math.min(1, dt * SHIP_TURN_RATE);
+          m.angle = ((m.angle + 540) % 360) - 180;
+        } else {
+          m.angle -= m.angle * Math.min(1, dt * 6);
+        }
+
+        movePlayer(m.x, m.y); // engine (colisões, tiros)
+        shipPos.setValue({ x: m.x, y: m.y }); // tela
+        shipAngle.setValue(m.angle);
+      }
+
+      raf = requestAnimationFrame(frame);
+    };
+
+    raf = requestAnimationFrame(frame);
+    return () => cancelAnimationFrame(raf);
+  }, []);
 
   const panResponder = useRef(
     PanResponder.create({
@@ -360,78 +436,42 @@ export default function Game() {
       onMoveShouldSetPanResponder: () =>
         !gameOverRef.current,
 
-      onPanResponderGrant: (_, gesture) => {
-        stopEase();
-
-        const c = playerRef.current;
-
-        // Diferença entre onde a nave está e onde ficaria sob o dedo.
-        // Ela vai sumindo aos poucos, então a nave "alcança" o dedo
-        // sem dar um pulo.
-        followOffset.current = {
-          x: c.x - (gesture.x0 - HALF_BOX),
-          y:
-            c.y -
-            (gesture.y0 - GAME_CONFIG.PLAYER_FINGER_LIFT - HALF_BOX),
-        };
-
-        lastApply.current = { t: 0, x: c.x, y: c.y };
+      onPanResponderGrant: () => {
+        motion.dragging = false;
       },
 
       onPanResponderMove: (_, gesture) => {
         if (gameOverRef.current) return;
 
-        // Limita a ~30 atualizações por segundo (cada uma redesenha
-        // o jogo; sem isso o toque deixava o jogo travado).
-        const now = Date.now();
-        if (now - lastApply.current.t < 33) return;
-
-        followOffset.current.x *= 0.8;
-        followOffset.current.y *= 0.8;
-
-        const { x, y } = targetFor(gesture.moveX, gesture.moveY);
-
-        // A ponta aponta para ONDE a nave está indo, para qualquer
-        // lado: 0° = cima, 90° = direita, 180° = baixo, -90° = esquerda.
-        const mx = x - lastApply.current.x;
-        const my = y - lastApply.current.y;
-
-        if (Math.hypot(mx, my) > 3) {
-          const target = Math.atan2(mx, -my) * (180 / Math.PI);
-          // caminho mais curto até o ângulo novo (passa pelo 180° sem girar ao contrário)
-          const diff =
-            ((target - angleRef.current + 540) % 360) - 180;
-          angleRef.current += diff * 0.4;
-          angleRef.current =
-            ((angleRef.current + 540) % 360) - 180;
+        // Só vira "arrastar" depois de mexer um pouco;
+        // um toque parado é um disparo, não move a nave.
+        if (!motion.dragging) {
+          if (
+            Math.hypot(gesture.dx, gesture.dy) <
+            GAME_CONFIG.TAP_MOVE_THRESHOLD
+          ) {
+            return;
+          }
+          motion.dragging = true;
         }
 
-        lastApply.current = { t: now, x, y };
-        updatePlayerPosition(x, y, angleRef.current);
+        const t = toTarget(gesture.moveX, gesture.moveY);
+        motion.tx = t.x;
+        motion.ty = t.y;
       },
 
-      onPanResponderRelease: (_, gesture) => {
+      onPanResponderRelease: () => {
         if (gameOverRef.current) return;
 
-        const tap =
-          Math.abs(gesture.dx) < 10 && Math.abs(gesture.dy) < 10;
-
-        if (!tap) {
-          // posição final (a última pode ter sido ignorada pelo limite)
-          const { x, y } = targetFor(gesture.moveX, gesture.moveY);
-          updatePlayerPosition(x, y, angleRef.current);
-        }
-
-        easeToUpright();
-
-        // Toque rápido (quase sem mover) = 1 disparo
-        if (tap) {
+        // Toque rápido (sem arrastar) = 1 disparo
+        if (!motion.dragging) {
           handleShootRef.current();
         }
+        motion.dragging = false;
       },
 
       onPanResponderTerminate: () => {
-        easeToUpright();
+        motion.dragging = false;
       },
     })
   ).current;
@@ -493,7 +533,7 @@ export default function Game() {
 
         <GameRenderer
           stars={stars}
-          trail={trail}
+          trail={EMPTY_TRAIL}
           collectibles={
             collectibles
           }
@@ -507,7 +547,7 @@ export default function Game() {
           explosions={
             explosions
           }
-          shield={shield}
+          shield={false}
           player={player}
           pulseAnim={
             pulseAnim
@@ -521,28 +561,48 @@ export default function Game() {
             PLAYER
         ==================================================== */}
 
-        <View
+        <Animated.View
           pointerEvents="none"
           style={{
             position: "absolute",
-            left: player.x,
-            top: player.y,
+            left: 0,
+            top: 0,
             width: 90,
             height: 90,
-            justifyContent:
-              "center",
-            alignItems:
-              "center",
             zIndex: 10,
+            transform: shipPos.getTranslateTransform(),
           }}
         >
-          <Player
-			  x={0}
-			  y={0}
-			  angle={player.angle}
-			  image={selectedShip?.image}
-		   />
-        </View>
+          {shield && (
+            <ShieldEffect player={{ x: 25, y: 25, angle: 0 }} />
+          )}
+
+          {/* A nave (60x60) fica no CENTRO da caixa de 90x90 e gira em torno dele */}
+          <Animated.View
+            style={{
+              position: "absolute",
+              left: 15,
+              top: 15,
+              width: 60,
+              height: 60,
+              transform: [
+                {
+                  rotate: shipAngle.interpolate({
+                    inputRange: [-180, 180],
+                    outputRange: ["-180deg", "180deg"],
+                  }),
+                },
+              ],
+            }}
+          >
+            <Player
+              x={0}
+              y={0}
+              angle={0}
+              image={selectedShip?.image}
+            />
+          </Animated.View>
+        </Animated.View>
 
         {/* ====================================================
             NÍVEL DE TIRO

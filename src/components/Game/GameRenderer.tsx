@@ -202,42 +202,23 @@ const GlowBullet = memo(function GlowBullet({
 }) {
   return (
     <View
+      pointerEvents="none"
       style={{
         position: "absolute",
-        left: bullet.x - 2,
-        top: bullet.y - 4,
-        alignItems: "center",
+        left: 0,
+        top: 0,
+        width: 7,
+        height: 15,
+        borderRadius: 4,
+        backgroundColor: "#00eeff",
+        borderWidth: 1,
+        borderColor: "rgba(120,230,255,0.7)",
+        transform: [
+          { translateX: bullet.x - 2 },
+          { translateY: bullet.y - 4 },
+        ],
       }}
-    >
-      {/* Halo */}
-      <View
-        style={{
-          position: "absolute",
-          width: 12,
-          height: 18,
-          borderRadius: 6,
-          backgroundColor:
-            "rgba(0,200,255,0.18)",
-        }}
-      />
-
-      {/* Núcleo */}
-      <View
-        style={{
-          width: 7,
-          height: 13,
-          borderRadius: 4,
-          backgroundColor: "#00eeff",
-
-          /**
-           * Shadow menor.
-           */
-          shadowColor: "#00eeff",
-          shadowRadius: 4,
-          shadowOpacity: 0.7,
-        }}
-      />
-    </View>
+    />
   );
 });
 
@@ -382,7 +363,7 @@ const ExplosionEffect = memo(
  * Continua animado porque normalmente existe apenas um shield.
  */
 
-const ShieldEffect = memo(
+export const ShieldEffect = memo(
   function ShieldEffect({
     player,
   }: {
@@ -585,14 +566,16 @@ const PulsingCollectible = memo(
         style={{
           position: "absolute",
 
-          left: c.x,
-          top: c.y,
+          left: 0,
+          top: 0,
 
           fontSize: c.special
             ? 34
             : 28,
 
           transform: [
+            { translateX: c.x },
+            { translateY: c.y },
             {
               scale: pulse,
             },
@@ -622,11 +605,16 @@ const ObstacleView = memo(
         style={{
           position: "absolute",
 
-          left: obstacle.x,
-          top: obstacle.y,
+          left: 0,
+          top: 0,
 
           fontSize:
             obstacle.fontSize,
+
+          transform: [
+            { translateX: obstacle.x },
+            { translateY: obstacle.y },
+          ],
         }}
       >
         {obstacle.emoji}
@@ -651,17 +639,18 @@ const EnemyBulletView = memo(function EnemyBulletView({
       pointerEvents="none"
       style={{
         position: "absolute",
-        left: bullet.x - 8,
-        top: bullet.y - 8,
+        left: 0,
+        top: 0,
         width: 16,
         height: 16,
         borderRadius: 8,
         backgroundColor: "#ff3b30",
         borderWidth: 2,
         borderColor: "#ffd2a0",
-        shadowColor: "#ff3b30",
-        shadowRadius: 6,
-        shadowOpacity: 0.9,
+        transform: [
+          { translateX: bullet.x - 8 },
+          { translateY: bullet.y - 8 },
+        ],
       }}
     />
   );
@@ -685,8 +674,8 @@ const PowerUpView = memo(function PowerUpView({
       pointerEvents="none"
       style={{
         position: "absolute",
-        left: p.x - 17,
-        top: p.y - 17,
+        left: 0,
+        top: 0,
         width: 34,
         height: 34,
         borderRadius: 17,
@@ -695,10 +684,11 @@ const PowerUpView = memo(function PowerUpView({
         borderColor: "#ffffff",
         alignItems: "center",
         justifyContent: "center",
-        transform: [{ scale: pulse }],
-        shadowColor: "#ffaa00",
-        shadowRadius: 8,
-        shadowOpacity: 0.9,
+        transform: [
+          { translateX: p.x - 17 },
+          { translateY: p.y - 17 },
+          { scale: pulse },
+        ],
       }}
     >
       <Text
@@ -735,12 +725,16 @@ const BossView = memo(function BossView({
       pointerEvents="none"
       style={{
         position: "absolute",
-        left: boss.x - boss.size / 2,
-        top: boss.y - boss.size / 2,
+        left: 0,
+        top: 0,
         width: boss.size,
         height: boss.size,
         alignItems: "center",
         justifyContent: "center",
+        transform: [
+          { translateX: boss.x - boss.size / 2 },
+          { translateY: boss.y - boss.size / 2 },
+        ],
       }}
     >
       {/* Barra de vida */}
@@ -1022,51 +1016,6 @@ function GameRenderer({
         />
       )}
 
-      {/* ======================================================
-          INDICADOR DE TIRO
-      ====================================================== */}
-
-      {!gameOver && (
-        <Animated.View
-          style={{
-            position: "absolute",
-
-            left:
-              player.x + 38,
-
-            top:
-              player.y - 8,
-
-            transform: [
-              {
-                scale: pulseAnim,
-              },
-            ],
-
-            backgroundColor:
-              "rgba(0,200,255,0.25)",
-
-            borderRadius: 50,
-
-            paddingHorizontal: 5,
-            paddingVertical: 2,
-
-            borderWidth: 1,
-
-            borderColor:
-              "rgba(0,220,255,0.5)",
-          }}
-        >
-          <Text
-            style={{
-              fontSize: 10,
-              color: "#00eeff",
-            }}
-          >
-            ⚡
-          </Text>
-        </Animated.View>
-      )}
     </>
   );
 }
