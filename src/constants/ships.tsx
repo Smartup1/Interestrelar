@@ -62,4 +62,42 @@ export const SHIPS: Ship[] = [
 /**
  * Procura uma nave pelo ID.
  */
-export function getShipById(id: string): Ship |
+/**
+ * Procura uma nave pelo ID.
+ */
+export function getShipById(id: string): Ship | undefined {
+  return SHIPS.find((ship) => ship.id === id);
+}
+
+/**
+ * Verifica se o jogador já desbloqueou uma nave.
+ */
+export function isShipUnlocked(
+  ship: Ship,
+  score: number
+): boolean {
+  return score >= ship.unlockScore;
+}
+
+/**
+ * Retorna todas as naves que o jogador já desbloqueou.
+ */
+export function getUnlockedShips(score: number): Ship[] {
+  return SHIPS.filter((ship) => score >= ship.unlockScore);
+}
+
+/**
+ * Retorna todas as naves que ainda estão bloqueadas.
+ */
+export function getLockedShips(score: number): Ship[] {
+  return SHIPS.filter((ship) => score < ship.unlockScore);
+}
+
+/**
+ * Retorna a próxima nave que será desbloqueada.
+ */
+export function getNextShipToUnlock(score: number): Ship | undefined {
+  return SHIPS
+    .filter((ship) => ship.unlockScore > score)
+    .sort((a, b) => a.unlockScore - b.unlockScore)[0];
+}
