@@ -49,3 +49,39 @@ export interface Star {
   y: number;
   size: number;
 }
+
+export interface EnemyBullet {
+  id: number;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+}
+
+// x e y = CENTRO do item
+export interface PowerUp {
+  id: number;
+  x: number;
+  y: number;
+  speed: number;
+}
+
+// x e y = CENTRO do chefão
+export interface Boss {
+  id: number;
+  x: number;
+  y: number;
+  hp: number;
+  maxHp: number;
+  level: number;
+  emoji: string;
+  size: number;
+  spawnTick: number;
+  wave: number;
+  hitFlash: number;
+}
+
+export interface Banner {
+  id: number;
+  text: string;
+}

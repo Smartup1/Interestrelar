@@ -824,3 +824,193 @@
 {"_e":"metro:client_log","_t":1791404080741,"level":"warn","data":["Linking requires a build-time setting `scheme` in the project's Expo config (app.config.js or app.json) for production apps, if it's left blank, your app may crash. The scheme does not apply to development in the Expo client but you should add it as soon as you start working with Linking to avoid creating a broken build. Learn more: https://docs.expo.dev/guides/linking/"]}
 {"_e":"metro:client_log","_t":1791404160307,"level":"log","data":["Erro ao liberar sons:","[Error: Call to function 'AudioPlayer.pause' has been rejected.\n→ Caused by: The 1st argument cannot be cast to type class expo.modules.audio.AudioPlayer (received class java.lang.Integer)\n→ Caused by: Cannot use shared object that was already released]"]}
 {"_e":"metro:client_log","_t":1791404163017,"level":"warn","data":["SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/AppAndFlow/react-native-safe-area-context"]}
+{"_e":"root:init","_t":1791514227710,"format":"v0-jsonl","version":"57.0.28"}
+{"_e":"env:mode","_t":1791514227737,"nodeEnv":"development","babelEnv":"development","mode":"development"}
+{"_e":"env:load","_t":1791514227764,"mode":"development","files":[],"env":{}}
+{"_e":"devserver:start","_t":1791514241021,"mode":"development","web":true,"baseUrl":"","asyncRoutes":false,"routerRoot":"../..\\..\\app","serverComponents":false,"serverActions":false,"serverRendering":false,"apiRoutes":false,"exporting":false}
+{"_e":"metro:config","_t":1791514252558,"serverRoot":"../..\\..","projectRoot":"../..\\..","exporting":false,"flags":{"autolinkingModuleResolution":false,"serverActions":false,"serverComponents":false,"reactCompiler":false,"optimizeGraph":false,"treeshaking":false,"logbox":false}}
+{"_e":"expo:dev-tools-plugin:load","_t":1791514257931,"plugins":[]}
+{"_e":"metro:instantiate","_t":1791514272857,"atlas":false,"workers":3,"host":"::","port":8081}
+{"_e":"metro:bundling:started","_t":1791514322552,"id":"1","platform":"android","environment":null,"entry":"node_modules\\expo-router\\entry.js"}
+{"_e":"metro:bundling:progress","_t":1791514322554,"id":"1","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791514322569,"id":"1","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791514322682,"id":"1","progress":0.09765625,"total":16,"current":5}
+{"_e":"metro:bundling:progress","_t":1791514322782,"id":"1","progress":0.140625,"total":32,"current":12}
+{"_e":"metro:bundling:progress","_t":1791514322896,"id":"1","progress":0.140625,"total":134,"current":17}
+{"_e":"metro:bundling:progress","_t":1791514322998,"id":"1","progress":0.140625,"total":160,"current":22}
+{"_e":"metro:bundling:progress","_t":1791514323476,"id":"1","progress":0.140625,"total":160,"current":23}
+{"_e":"metro:bundling:progress","_t":1791514323579,"id":"1","progress":0.140625,"total":183,"current":39}
+{"_e":"metro:bundling:progress","_t":1791514323682,"id":"1","progress":0.140625,"total":200,"current":47}
+{"_e":"metro:bundling:progress","_t":1791514323787,"id":"1","progress":0.140625,"total":224,"current":65}
+{"_e":"metro:bundling:progress","_t":1791514323899,"id":"1","progress":0.140625,"total":243,"current":79}
+{"_e":"metro:bundling:progress","_t":1791514324008,"id":"1","progress":0.14947278229985766,"total":269,"current":104}
+{"_e":"metro:bundling:progress","_t":1791514324109,"id":"1","progress":0.18114007255660255,"total":289,"current":123}
+{"_e":"metro:bundling:progress","_t":1791514324209,"id":"1","progress":0.18114007255660255,"total":357,"current":151}
+{"_e":"metro:bundling:progress","_t":1791514324310,"id":"1","progress":0.18114007255660255,"total":380,"current":158}
+{"_e":"metro:bundling:progress","_t":1791514324519,"id":"1","progress":0.18114007255660255,"total":380,"current":159}
+{"_e":"metro:bundling:progress","_t":1791514324619,"id":"1","progress":0.1895064478602015,"total":402,"current":175}
+{"_e":"metro:bundling:progress","_t":1791514324729,"id":"1","progress":0.2179252487590126,"total":422,"current":197}
+{"_e":"metro:bundling:progress","_t":1791514324829,"id":"1","progress":0.23118079582571122,"total":443,"current":213}
+{"_e":"metro:bundling:progress","_t":1791514324942,"id":"1","progress":0.23439518345855923,"total":473,"current":229}
+{"_e":"metro:bundling:progress","_t":1791514325042,"id":"1","progress":0.254016,"total":500,"current":252}
+{"_e":"metro:bundling:progress","_t":1791514325153,"id":"1","progress":0.274083044982699,"total":510,"current":267}
+{"_e":"metro:bundling:progress","_t":1791514325242,"id":"1","progress":0.274083044982699,"total":525,"current":274}
+{"_e":"metro:bundling:progress","_t":1791514325344,"id":"1","progress":0.2938990191737444,"total":546,"current":296}
+{"_e":"metro:bundling:progress","_t":1791514325447,"id":"1","progress":0.3273829867674859,"total":575,"current":329}
+{"_e":"metro:bundling:progress","_t":1791514325545,"id":"1","progress":0.32815446690934613,"total":604,"current":346}
+{"_e":"metro:bundling:progress","_t":1791514325650,"id":"1","progress":0.341494140625,"total":640,"current":374}
+{"_e":"metro:bundling:progress","_t":1791514325763,"id":"1","progress":0.34699462890625005,"total":640,"current":377}
+{"_e":"metro:bundling:progress","_t":1791514325870,"id":"1","progress":0.3488378906249999,"total":640,"current":378}
+{"_e":"metro:bundling:progress","_t":1791514325976,"id":"1","progress":0.3488378906249999,"total":688,"current":391}
+{"_e":"metro:bundling:progress","_t":1791514326101,"id":"1","progress":0.3488378906249999,"total":688,"current":392}
+{"_e":"metro:bundling:progress","_t":1791514326201,"id":"1","progress":0.3488378906249999,"total":718,"current":419}
+{"_e":"metro:bundling:progress","_t":1791514326305,"id":"1","progress":0.36944115488844165,"total":742,"current":451}
+{"_e":"metro:bundling:progress","_t":1791514326420,"id":"1","progress":0.4136322453328984,"total":751,"current":483}
+{"_e":"metro:bundling:progress","_t":1791514326519,"id":"1","progress":0.4896345329233958,"total":766,"current":536}
+{"_e":"metro:bundling:progress","_t":1791514326619,"id":"1","progress":0.5155887839900504,"total":798,"current":573}
+{"_e":"metro:bundling:progress","_t":1791514326720,"id":"1","progress":0.5501753586950496,"total":817,"current":606}
+{"_e":"metro:bundling:progress","_t":1791514326820,"id":"1","progress":0.5501753586950496,"total":843,"current":617}
+{"_e":"metro:bundling:progress","_t":1791514326921,"id":"1","progress":0.5501753586950496,"total":861,"current":633}
+{"_e":"metro:bundling:progress","_t":1791514327066,"id":"1","progress":0.5501753586950496,"total":861,"current":634}
+{"_e":"metro:bundling:progress","_t":1791514327182,"id":"1","progress":0.5502514464100431,"total":883,"current":655}
+{"_e":"metro:bundling:progress","_t":1791514327318,"id":"1","progress":0.5505212721468613,"total":903,"current":670}
+{"_e":"metro:bundling:progress","_t":1791514327448,"id":"1","progress":0.5505212721468613,"total":930,"current":684}
+{"_e":"metro:bundling:progress","_t":1791514327577,"id":"1","progress":0.5505212721468613,"total":931,"current":684}
+{"_e":"metro:bundling:progress","_t":1791514327585,"id":"1","progress":0.5505212721468613,"total":931,"current":685}
+{"_e":"metro:bundling:progress","_t":1791514327696,"id":"1","progress":0.5736304723245919,"total":948,"current":718}
+{"_e":"metro:bundling:progress","_t":1791514327798,"id":"1","progress":0.5834597187964392,"total":957,"current":731}
+{"_e":"metro:bundling:progress","_t":1791514327899,"id":"1","progress":0.5923274110374974,"total":968,"current":745}
+{"_e":"metro:bundling:progress","_t":1791514328008,"id":"1","progress":0.6116450487595455,"total":982,"current":768}
+{"_e":"metro:bundling:progress","_t":1791514328127,"id":"1","progress":0.6326021478277837,"total":992,"current":789}
+{"_e":"metro:bundling:progress","_t":1791514328227,"id":"1","progress":0.6573268678274947,"total":1004,"current":814}
+{"_e":"metro:bundling:progress","_t":1791514328330,"id":"1","progress":0.7123826582171163,"total":1013,"current":855}
+{"_e":"metro:bundling:progress","_t":1791514328444,"id":"1","progress":0.784341379933093,"total":1023,"current":906}
+{"_e":"metro:bundling:progress","_t":1791514328549,"id":"1","progress":0.7897410618983047,"total":1033,"current":918}
+{"_e":"metro:bundling:progress","_t":1791514328675,"id":"1","progress":0.797009031716026,"total":1035,"current":924}
+{"_e":"metro:bundling:progress","_t":1791514328775,"id":"1","progress":0.804689381416411,"total":1049,"current":941}
+{"_e":"metro:bundling:progress","_t":1791514328878,"id":"1","progress":0.8091551499922854,"total":1065,"current":958}
+{"_e":"metro:bundling:progress","_t":1791514328978,"id":"1","progress":0.8113363577848073,"total":1078,"current":971}
+{"_e":"metro:bundling:progress","_t":1791514329078,"id":"1","progress":0.8565187475297675,"total":1087,"current":1006}
+{"_e":"metro:bundling:progress","_t":1791514329179,"id":"1","progress":0.8831883691192924,"total":1096,"current":1030}
+{"_e":"metro:bundling:progress","_t":1791514329280,"id":"1","progress":0.8831883691192924,"total":1117,"current":1045}
+{"_e":"metro:bundling:progress","_t":1791514329380,"id":"1","progress":0.8831883691192924,"total":1145,"current":1074}
+{"_e":"metro:bundling:progress","_t":1791514329497,"id":"1","progress":0.8854287229938271,"total":1152,"current":1084}
+{"_e":"metro:bundling:progress","_t":1791514329530,"id":"1","progress":0.8870631088445217,"total":1152,"current":1085}
+{"_e":"metro:bundling:progress","_t":1791514329633,"id":"1","progress":0.8870631088445217,"total":1156,"current":1088}
+{"_e":"metro:bundling:progress","_t":1791514329734,"id":"1","progress":0.8998156237402608,"total":1167,"current":1107}
+{"_e":"metro:bundling:progress","_t":1791514329845,"id":"1","progress":0.9218605782131607,"total":1179,"current":1132}
+{"_e":"metro:bundling:progress","_t":1791514329960,"id":"1","progress":0.9403122130394859,"total":1188,"current":1152}
+{"_e":"metro:bundling:progress","_t":1791514330065,"id":"1","progress":0.9403122130394859,"total":1227,"current":1170}
+{"_e":"metro:bundling:progress","_t":1791514330169,"id":"1","progress":0.9403122130394859,"total":1236,"current":1178}
+{"_e":"metro:bundling:progress","_t":1791514330225,"id":"1","progress":0.9403122130394859,"total":1236,"current":1179}
+{"_e":"metro:bundling:progress","_t":1791514330371,"id":"1","progress":0.9403122130394859,"total":1293,"current":1187}
+{"_e":"metro:bundling:progress","_t":1791514330502,"id":"1","progress":0.9403122130394859,"total":1298,"current":1204}
+{"_e":"metro:bundling:progress","_t":1791514330622,"id":"1","progress":0.9403122130394859,"total":1304,"current":1230}
+{"_e":"metro:bundling:progress","_t":1791514330705,"id":"1","progress":0.9403122130394859,"total":1312,"current":1241}
+{"_e":"metro:bundling:progress","_t":1791514330805,"id":"1","progress":0.9448897189693413,"total":1324,"current":1287}
+{"_e":"metro:bundling:progress","_t":1791514330908,"id":"1","progress":0.9484054233287467,"total":1339,"current":1304}
+{"_e":"metro:bundling:progress","_t":1791514331009,"id":"1","progress":0.9621301903114186,"total":1360,"current":1334}
+{"_e":"metro:bundling:progress","_t":1791514331110,"id":"1","progress":0.9621301903114186,"total":1381,"current":1352}
+{"_e":"metro:bundling:progress","_t":1791514331210,"id":"1","progress":0.9621301903114186,"total":1408,"current":1376}
+{"_e":"metro:bundling:progress","_t":1791514331310,"id":"1","progress":0.9634348991402224,"total":1409,"current":1383}
+{"_e":"metro:bundling:progress","_t":1791514331414,"id":"1","progress":0.9957642123138009,"total":1415,"current":1412}
+{"_e":"metro:bundling:progress","_t":1791514339111,"id":"1","progress":0.9971751426537976,"total":1415,"current":1413}
+{"_e":"metro:bundling:progress","_t":1791514339221,"id":"1","progress":0.9971751426537976,"total":1430,"current":1415}
+{"_e":"metro:bundling:progress","_t":1791514339321,"id":"1","progress":0.9971751426537976,"total":1440,"current":1426}
+{"_e":"metro:bundling:progress","_t":1791514339427,"id":"1","progress":0.9971751426537976,"total":1446,"current":1443}
+{"_e":"metro:bundling:progress","_t":1791514339555,"id":"1","progress":0.999,"total":1446,"current":1446}
+{"_e":"metro:bundling:done","_t":1791514339777,"id":"1","total":1446,"ms":17224.8598}
+{"_e":"metro:client_log","_t":1791514360030,"level":"warn","data":["Linking requires a build-time setting `scheme` in the project's Expo config (app.config.js or app.json) for production apps, if it's left blank, your app may crash. The scheme does not apply to development in the Expo client but you should add it as soon as you start working with Linking to avoid creating a broken build. Learn more: https://docs.expo.dev/guides/linking/"]}
+{"_e":"metro:client_log","_t":1791514366838,"level":"warn","data":["SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/AppAndFlow/react-native-safe-area-context"]}
+{"_e":"metro:client_log","_t":1791514536135,"level":"log","data":["Erro ao liberar sons:","[Error: Call to function 'AudioPlayer.pause' has been rejected.\n→ Caused by: The 1st argument cannot be cast to type class expo.modules.audio.AudioPlayer (received class java.lang.Integer)\n→ Caused by: Cannot use shared object that was already released]"]}
+{"_e":"metro:client_log","_t":1791514592671,"level":"log","data":["Erro ao liberar sons:","[Error: Call to function 'AudioPlayer.pause' has been rejected.\n→ Caused by: The 1st argument cannot be cast to type class expo.modules.audio.AudioPlayer (received class java.lang.Integer)\n→ Caused by: Cannot use shared object that was already released]"]}
+{"_e":"metro:client_log","_t":1791514592807,"level":"log","data":["Erro ao liberar sons:","[Error: Call to function 'AudioPlayer.pause' has been rejected.\n→ Caused by: The 1st argument cannot be cast to type class expo.modules.audio.AudioPlayer (received class java.lang.Integer)\n→ Caused by: Cannot use shared object that was already released]"]}
+{"_e":"root:init","_t":1791514786421,"format":"v0-jsonl","version":"57.0.28"}
+{"_e":"env:mode","_t":1791514786422,"nodeEnv":"development","babelEnv":"development","mode":"development"}
+{"_e":"env:load","_t":1791514786427,"mode":"development","files":[],"env":{}}
+{"_e":"devserver:start","_t":1791514787405,"mode":"development","web":true,"baseUrl":"","asyncRoutes":false,"routerRoot":"../..\\..\\app","serverComponents":false,"serverActions":false,"serverRendering":false,"apiRoutes":false,"exporting":false}
+{"_e":"metro:config","_t":1791514788352,"serverRoot":"../..\\..","projectRoot":"../..\\..","exporting":false,"flags":{"autolinkingModuleResolution":false,"serverActions":false,"serverComponents":false,"reactCompiler":false,"optimizeGraph":false,"treeshaking":false,"logbox":false}}
+{"_e":"expo:dev-tools-plugin:load","_t":1791514789423,"plugins":[]}
+{"_e":"metro:instantiate","_t":1791514802296,"atlas":false,"workers":3,"host":"::","port":8081}
+{"_e":"metro:bundling:started","_t":1791515105656,"id":"1","platform":"android","environment":null,"entry":"node_modules\\expo-router\\entry.js"}
+{"_e":"metro:bundling:progress","_t":1791515105658,"id":"1","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791515105666,"id":"1","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791515105766,"id":"1","progress":0.022096420745069397,"total":74,"current":11}
+{"_e":"metro:bundling:progress","_t":1791515105873,"id":"1","progress":0.041738929355994915,"total":186,"current":38}
+{"_e":"metro:bundling:progress","_t":1791515105973,"id":"1","progress":0.07949855842614055,"total":266,"current":75}
+{"_e":"metro:bundling:progress","_t":1791515106074,"id":"1","progress":0.1829938271604938,"total":360,"current":154}
+{"_e":"metro:bundling:progress","_t":1791515106180,"id":"1","progress":0.2219650219479543,"total":433,"current":204}
+{"_e":"metro:bundling:progress","_t":1791515106284,"id":"1","progress":0.26728345083381067,"total":559,"current":289}
+{"_e":"metro:bundling:progress","_t":1791515106404,"id":"1","progress":0.33964675746331585,"total":616,"current":359}
+{"_e":"metro:bundling:progress","_t":1791515106504,"id":"1","progress":0.3454926869063574,"total":655,"current":385}
+{"_e":"metro:bundling:progress","_t":1791515106604,"id":"1","progress":0.3753943058874063,"total":772,"current":473}
+{"_e":"metro:bundling:progress","_t":1791515106704,"id":"1","progress":0.5072470972864143,"total":827,"current":589}
+{"_e":"metro:bundling:progress","_t":1791515106804,"id":"1","progress":0.5072470972864143,"total":905,"current":644}
+{"_e":"metro:bundling:progress","_t":1791515106907,"id":"1","progress":0.6133362880886426,"total":950,"current":744}
+{"_e":"metro:bundling:progress","_t":1791515107008,"id":"1","progress":0.7280634327415975,"total":995,"current":849}
+{"_e":"metro:bundling:progress","_t":1791515107117,"id":"1","progress":0.7746058616326391,"total":1026,"current":903}
+{"_e":"metro:bundling:progress","_t":1791515107217,"id":"1","progress":0.8259850730124392,"total":1075,"current":977}
+{"_e":"metro:bundling:progress","_t":1791515107322,"id":"1","progress":0.865606473321583,"total":1106,"current":1029}
+{"_e":"metro:bundling:progress","_t":1791515107423,"id":"1","progress":0.9204728836866612,"total":1158,"current":1111}
+{"_e":"metro:bundling:progress","_t":1791515107524,"id":"1","progress":0.9204728836866612,"total":1240,"current":1184}
+{"_e":"metro:bundling:progress","_t":1791515107624,"id":"1","progress":0.9204728836866612,"total":1316,"current":1239}
+{"_e":"metro:bundling:progress","_t":1791515107724,"id":"1","progress":0.9514600678956937,"total":1343,"current":1310}
+{"_e":"metro:bundling:progress","_t":1791515107824,"id":"1","progress":0.9677779573238852,"total":1416,"current":1393}
+{"_e":"metro:bundling:progress","_t":1791515107931,"id":"1","progress":0.9985930357000476,"total":1421,"current":1420}
+{"_e":"metro:bundling:progress","_t":1791515108862,"id":"1","progress":0.999,"total":1421,"current":1421}
+{"_e":"metro:bundling:progress","_t":1791515108970,"id":"1","progress":0.999,"total":1446,"current":1446}
+{"_e":"metro:bundling:done","_t":1791515109076,"id":"1","total":1446,"ms":3419.8008}
+{"_e":"metro:client_log","_t":1791515120014,"level":"warn","data":["Linking requires a build-time setting `scheme` in the project's Expo config (app.config.js or app.json) for production apps, if it's left blank, your app may crash. The scheme does not apply to development in the Expo client but you should add it as soon as you start working with Linking to avoid creating a broken build. Learn more: https://docs.expo.dev/guides/linking/"]}
+{"_e":"metro:bundling:started","_t":1791515515027,"id":"d","platform":"android","environment":null,"entry":"node_modules\\expo-router\\entry.js"}
+{"_e":"metro:bundling:progress","_t":1791515515027,"id":"d","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1791515515151,"id":"d","total":1,"ms":123.6201}
+{"_e":"metro:client_log","_t":1791515522931,"level":"warn","data":["Linking requires a build-time setting `scheme` in the project's Expo config (app.config.js or app.json) for production apps, if it's left blank, your app may crash. The scheme does not apply to development in the Expo client but you should add it as soon as you start working with Linking to avoid creating a broken build. Learn more: https://docs.expo.dev/guides/linking/"]}
+{"_e":"metro:client_log","_t":1791515523595,"level":"error","data":["Can't perform a React state update on a component that hasn't mounted yet. This indicates that you have a side-effect in your render function that asynchronously tries to update the component. Move this work to useEffect instead.","\n\n\u001b[1mCall Stack\u001b[22m\n\u001b[2m\u001b[90m  apply (<native>)\u001b[39m\u001b[22m\n\u001b[2m\u001b[90m  NamelessError (node_modules\\@expo\\metro-runtime\\src\\metroServerLogs.native.ts:105)\u001b[39m\u001b[22m\n\u001b[2m\u001b[90m  captureCurrentStack (node_modules\\@expo\\metro-runtime\\src\\metroServerLogs.native.ts:110:27)\u001b[39m\u001b[22m\n\u001b[2m\u001b[90m  HMRClient.log (node_modules\\@expo\\metro-runtime\\src\\metroServerLogs.native.ts:42:79)\u001b[39m\u001b[22m\n\u001b[2m\u001b[90m  console.level (node_modules\\react-native\\Libraries\\Core\\setUpDeveloperTools.js:41:24)\u001b[39m\u001b[22m\n\u001b[2m\u001b[90m  runWithFiberInDEV$argument_1 (node_modules\\react-native\\Libraries\\Renderer\\implementations\\ReactFabric-dev.js:15178:26)\u001b[39m\u001b[22m\n\u001b[2m\u001b[90m  run (<native>)\u001b[39m\u001b[22m\n\u001b[2m\u001b[90m  runWithFiberInDEV (node_modules\\react-native\\Libraries\\Renderer\\implementations\\ReactFabric-dev.js:697:33)\u001b[39m\u001b[22m\n\u001b[2m\u001b[90m  warnAboutUpdateOnNotYetMountedFiberInDEV (node_modules\\react-native\\Libraries\\Renderer\\implementations\\ReactFabric-dev.js:15177:28)\u001b[39m\u001b[22m\n\u001b[2m\u001b[90m  getRootForUpdatedFiber (node_modules\\react-native\\Libraries\\Renderer\\implementations\\ReactFabric-dev.js:5123:51)\u001b[39m\u001b[22m\n\u001b[2m\u001b[90m  enqueueConcurrentHookUpdate (node_modules\\react-native\\Libraries\\Renderer\\implementations\\ReactFabric-dev.js:5067:36)\u001b[39m\u001b[22m\n\u001b[2m\u001b[90m  dispatchSetStateInternal (node_modules\\react-native\\Libraries\\Renderer\\implementations\\ReactFabric-dev.js:6991:45)\u001b[39m\u001b[22m\n\u001b[2m\u001b[90m  dispatchSetState (node_modules\\react-native\\Libraries\\Renderer\\implementations\\ReactFabric-dev.js:6951:31)\u001b[39m\u001b[22m\n\u001b[2m\u001b[90m  url.then$argument_0 (node_modules\\expo-router\\build\\fork\\useLinking.native.js:127:47)\u001b[39m\u001b[22m\n\u001b[2m\u001b[90m  tryCallOne (address at (InternalBytecode.js:1:1296)\u001b[39m\u001b[22m\n\u001b[2m\u001b[90m  anonymous (address at (InternalBytecode.js:1:4984)\u001b[39m\u001b[22m","\n\n\u001b[1mCode: ExpoRoot.js\u001b[22m\n\u001b[2m(\u001b[22m\u001b[0mC:\\Users\\fortu\\Desktop\\Interestrelar\\Interestrelar\\node_modules\\expo-router\\build\\ExpoRoot.js\u001b[0m\u001b[2m:135:120)\u001b[22m\n\n\u001b[2m...\u001b[22mm\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 135 |\u001b[39m     \u001b[36mreturn\u001b[39m ((\u001b[35m0\u001b[39m\u001b[33m,\u001b[39m jsx_runtime_1\u001b[33m.\u001b[39mjsx)(storeContext\u001b[2m...\u001b[22m\n                                                              \u001b[0m^\u001b[0m\n\u001b[2m(error truncated)\u001b[22m\n\u001b[1mCall Stack\u001b[22m\n\u001b[2m\u001b[90m  ContextNavigator (node_modules\\expo-router\\build\\ExpoRoot.js:135:121)\u001b[39m\u001b[22m\n\u001b[2m\u001b[90m  ExpoRoot (node_modules\\expo-router\\build\\ExpoRoot.js:85:33)\u001b[39m\u001b[22m\n\u001b[2m\u001b[90m  App (node_modules\\expo-router\\build\\qualified-entry.js:20:91)\u001b[39m\u001b[22m\n\u001b[2m\u001b[90m  WithDevTools (node_modules\\expo\\src\\launch\\withDevTools.tsx:21:12)\u001b[39m\u001b[22m"]}
+{"_e":"metro:client_log","_t":1791515542466,"level":"log","data":["Erro ao liberar sons:","[Error: Call to function 'AudioPlayer.pause' has been rejected.\n→ Caused by: The 1st argument cannot be cast to type class expo.modules.audio.AudioPlayer (received class java.lang.Integer)\n→ Caused by: Cannot use shared object that was already released]"]}
+{"_e":"metro:bundling:started","_t":1791515898908,"id":"w","platform":"android","environment":null,"entry":"node_modules\\expo-router\\entry.js"}
+{"_e":"metro:bundling:progress","_t":1791515898908,"id":"w","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791515898911,"id":"w","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1791515899090,"id":"w","total":1,"ms":181.334}
+{"_e":"metro:client_log","_t":1791515908512,"level":"warn","data":["Linking requires a build-time setting `scheme` in the project's Expo config (app.config.js or app.json) for production apps, if it's left blank, your app may crash. The scheme does not apply to development in the Expo client but you should add it as soon as you start working with Linking to avoid creating a broken build. Learn more: https://docs.expo.dev/guides/linking/"]}
+{"_e":"metro:client_log","_t":1791515934284,"level":"log","data":["Erro ao liberar sons:","[Error: Call to function 'AudioPlayer.pause' has been rejected.\n→ Caused by: The 1st argument cannot be cast to type class expo.modules.audio.AudioPlayer (received class java.lang.Integer)\n→ Caused by: Cannot use shared object that was already released]"]}
+{"_e":"root:init","_t":1791553668328,"format":"v0-jsonl","version":"57.0.28"}
+{"_e":"env:mode","_t":1791553668330,"nodeEnv":"development","babelEnv":"development","mode":"development"}
+{"_e":"env:load","_t":1791553668335,"mode":"development","files":[],"env":{}}
+{"_e":"devserver:start","_t":1791553669392,"mode":"development","web":true,"baseUrl":"","asyncRoutes":false,"routerRoot":"../..\\..\\app","serverComponents":false,"serverActions":false,"serverRendering":false,"apiRoutes":false,"exporting":false}
+{"_e":"metro:config","_t":1791553670541,"serverRoot":"../..\\..","projectRoot":"../..\\..","exporting":false,"flags":{"autolinkingModuleResolution":false,"serverActions":false,"serverComponents":false,"reactCompiler":false,"optimizeGraph":false,"treeshaking":false,"logbox":false}}
+{"_e":"expo:dev-tools-plugin:load","_t":1791553671360,"plugins":[]}
+{"_e":"metro:instantiate","_t":1791553681763,"atlas":false,"workers":3,"host":"::","port":8081}
+{"_e":"metro:bundling:started","_t":1791553726241,"id":"1","platform":"android","environment":null,"entry":"node_modules\\expo-router\\entry.js"}
+{"_e":"metro:bundling:progress","_t":1791553726242,"id":"1","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791553726256,"id":"1","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1791553726361,"id":"1","progress":0.1563007030827474,"total":43,"current":17}
+{"_e":"metro:bundling:progress","_t":1791553726461,"id":"1","progress":0.1563007030827474,"total":190,"current":39}
+{"_e":"metro:bundling:progress","_t":1791553726561,"id":"1","progress":0.1563007030827474,"total":284,"current":89}
+{"_e":"metro:bundling:progress","_t":1791553726662,"id":"1","progress":0.18399584487534626,"total":380,"current":163}
+{"_e":"metro:bundling:progress","_t":1791553726762,"id":"1","progress":0.2703127952920287,"total":477,"current":248}
+{"_e":"metro:bundling:progress","_t":1791553726862,"id":"1","progress":0.3471104944007042,"total":572,"current":337}
+{"_e":"metro:bundling:progress","_t":1791553726962,"id":"1","progress":0.3471104944007042,"total":646,"current":377}
+{"_e":"metro:bundling:progress","_t":1791553727063,"id":"1","progress":0.3471104944007042,"total":760,"current":442}
+{"_e":"metro:bundling:progress","_t":1791553727163,"id":"1","progress":0.49735995288120455,"total":821,"current":579}
+{"_e":"metro:bundling:progress","_t":1791553727265,"id":"1","progress":0.5210017525015546,"total":931,"current":672}
+{"_e":"metro:bundling:progress","_t":1791553727364,"id":"1","progress":0.6023380671279496,"total":996,"current":773}
+{"_e":"metro:bundling:progress","_t":1791553727491,"id":"1","progress":0.7677257672938134,"total":1042,"current":913}
+{"_e":"metro:bundling:progress","_t":1791553727591,"id":"1","progress":0.817482639257576,"total":1085,"current":981}
+{"_e":"metro:bundling:progress","_t":1791553727692,"id":"1","progress":0.8646026898529509,"total":1126,"current":1047}
+{"_e":"metro:bundling:progress","_t":1791553727792,"id":"1","progress":0.8686496662825385,"total":1162,"current":1083}
+{"_e":"metro:bundling:progress","_t":1791553727892,"id":"1","progress":0.893652990936684,"total":1189,"current":1124}
+{"_e":"metro:bundling:progress","_t":1791553727992,"id":"1","progress":0.9336490033700824,"total":1215,"current":1174}
+{"_e":"metro:bundling:progress","_t":1791553728095,"id":"1","progress":0.9336490033700824,"total":1261,"current":1200}
+{"_e":"metro:bundling:progress","_t":1791553728279,"id":"1","progress":0.9524061365553206,"total":1287,"current":1256}
+{"_e":"metro:bundling:progress","_t":1791553728388,"id":"1","progress":0.9524061365553206,"total":1352,"current":1281}
+{"_e":"metro:bundling:progress","_t":1791553728489,"id":"1","progress":0.9524061365553206,"total":1367,"current":1326}
+{"_e":"metro:bundling:progress","_t":1791553728589,"id":"1","progress":0.9632280603076929,"total":1401,"current":1375}
+{"_e":"metro:bundling:progress","_t":1791553728689,"id":"1","progress":0.9848434848650066,"total":1446,"current":1435}
+{"_e":"metro:bundling:progress","_t":1791553728805,"id":"1","progress":0.994475148690813,"total":1446,"current":1442}
+{"_e":"metro:bundling:progress","_t":1791553729044,"id":"1","progress":0.9958549267402421,"total":1446,"current":1443}
+{"_e":"metro:bundling:progress","_t":1791553729150,"id":"1","progress":0.999,"total":1446,"current":1446}
+{"_e":"metro:bundling:done","_t":1791553729260,"id":"1","total":1446,"ms":3020.7896}
+{"_e":"metro:client_log","_t":1791553738070,"level":"warn","data":["Linking requires a build-time setting `scheme` in the project's Expo config (app.config.js or app.json) for production apps, if it's left blank, your app may crash. The scheme does not apply to development in the Expo client but you should add it as soon as you start working with Linking to avoid creating a broken build. Learn more: https://docs.expo.dev/guides/linking/"]}
+{"_e":"metro:client_log","_t":1791553897381,"level":"warn","data":["SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/AppAndFlow/react-native-safe-area-context"]}
+{"_e":"metro:server_log","_t":1791554443298,"level":"error","data":["[timeout] connection terminated with Device for app='%s' on device='%s' after not responding for %s seconds.","host.exp.exponent","SM-A325M - 13 - API 33","60"]}
+{"_e":"metro:client_log","_t":1791554542726,"level":"log","data":["Erro ao liberar sons:","[Error: Call to function 'AudioPlayer.pause' has been rejected.\n→ Caused by: The 1st argument cannot be cast to type class expo.modules.audio.AudioPlayer (received class java.lang.Integer)\n→ Caused by: Cannot use shared object that was already released]"]}

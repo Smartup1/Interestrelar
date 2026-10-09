@@ -14,6 +14,9 @@ import {
   Obstacle,
   Collectible,
   PlayerPosition,
+  EnemyBullet,
+  PowerUp,
+  Boss,
 } from "../../types/game";
 
 interface GameRendererProps {
@@ -22,6 +25,9 @@ interface GameRendererProps {
   collectibles: Collectible[];
   obstacles: Obstacle[];
   bullets: Bullet[];
+  enemyBullets: EnemyBullet[];
+  powerUps: PowerUp[];
+  boss: Boss | null;
   explosions: Explosion[];
   shield: boolean;
   player: PlayerPosition;
@@ -631,6 +637,151 @@ const ObstacleView = memo(
 
 /**
  * ============================================================
+ * TIRO INIMIGO
+ * ============================================================
+ */
+
+const EnemyBulletView = memo(function EnemyBulletView({
+  bullet,
+}: {
+  bullet: EnemyBullet;
+}) {
+  return (
+    <View
+      pointerEvents="none"
+      style={{
+        position: "absolute",
+        left: bullet.x - 8,
+        top: bullet.y - 8,
+        width: 16,
+        height: 16,
+        borderRadius: 8,
+        backgroundColor: "#ff3b30",
+        borderWidth: 2,
+        borderColor: "#ffd2a0",
+        shadowColor: "#ff3b30",
+        shadowRadius: 6,
+        shadowOpacity: 0.9,
+      }}
+    />
+  );
+});
+
+/**
+ * ============================================================
+ * ITEM "P" (NÍVEL DE TIRO)
+ * ============================================================
+ */
+
+const PowerUpView = memo(function PowerUpView({
+  p,
+  pulse,
+}: {
+  p: PowerUp;
+  pulse: Animated.Value;
+}) {
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: "absolute",
+        left: p.x - 17,
+        top: p.y - 17,
+        width: 34,
+        height: 34,
+        borderRadius: 17,
+        backgroundColor: "#ff9500",
+        borderWidth: 2,
+        borderColor: "#ffffff",
+        alignItems: "center",
+        justifyContent: "center",
+        transform: [{ scale: pulse }],
+        shadowColor: "#ffaa00",
+        shadowRadius: 8,
+        shadowOpacity: 0.9,
+      }}
+    >
+      <Text
+        style={{
+          color: "#ffffff",
+          fontWeight: "900",
+          fontSize: 18,
+        }}
+      >
+        P
+      </Text>
+    </Animated.View>
+  );
+});
+
+/**
+ * ============================================================
+ * CHEFÃO
+ * ============================================================
+ */
+
+const BossView = memo(function BossView({
+  boss,
+}: {
+  boss: Boss;
+}) {
+  const pct = Math.max(0, boss.hp / boss.maxHp);
+
+  const barColor =
+    pct > 0.5 ? "#33dd55" : pct > 0.25 ? "#ffcc00" : "#ff3322";
+
+  return (
+    <View
+      pointerEvents="none"
+      style={{
+        position: "absolute",
+        left: boss.x - boss.size / 2,
+        top: boss.y - boss.size / 2,
+        width: boss.size,
+        height: boss.size,
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      {/* Barra de vida */}
+      <View
+        style={{
+          position: "absolute",
+          top: -14,
+          width: boss.size,
+          height: 9,
+          borderRadius: 5,
+          backgroundColor: "rgba(0,0,0,0.65)",
+          borderWidth: 1,
+          borderColor: "rgba(255,255,255,0.6)",
+          overflow: "hidden",
+        }}
+      >
+        <View
+          style={{
+            width: `${pct * 100}%`,
+            height: "100%",
+            backgroundColor: barColor,
+          }}
+        />
+      </View>
+
+      <Text
+        style={{
+          fontSize: boss.size * 0.85,
+          lineHeight: boss.size,
+          textAlign: "center",
+          opacity: boss.hitFlash > 0 ? 0.45 : 1,
+        }}
+      >
+        {boss.emoji}
+      </Text>
+    </View>
+  );
+});
+
+/**
+ * ============================================================
  * GAME RENDERER
  * ============================================================
  */
@@ -641,6 +792,9 @@ function GameRenderer({
   collectibles,
   obstacles,
   bullets,
+  enemyBullets,
+  powerUps,
+  boss,
   explosions,
   shield,
   player,
@@ -796,6 +950,18 @@ function GameRenderer({
       )}
 
       {/* ======================================================
+          ITENS "P"
+      ====================================================== */}
+
+      {powerUps.map((p) => (
+        <PowerUpView
+          key={p.id}
+          p={p}
+          pulse={collectiblePulse}
+        />
+      ))}
+
+      {/* ======================================================
           OBSTÁCULOS
       ====================================================== */}
 
@@ -807,6 +973,20 @@ function GameRenderer({
           />
         )
       )}
+
+      {/* ======================================================
+          CHEFÃO
+      ====================================================== */}
+
+      {boss && <BossView boss={boss} />}
+
+      {/* ======================================================
+          TIROS INIMIGOS
+      ====================================================== */}
+
+      {enemyBullets.map((b) => (
+        <EnemyBulletView key={b.id} bullet={b} />
+      ))}
 
       {/* ======================================================
           BALAS

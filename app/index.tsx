@@ -869,7 +869,29 @@ export default function HomeScreen() {
                   MINHAS NAVES
                 </Text>
               </TouchableOpacity>
+			<View style={{ flexDirection: 'row', gap: 10 }}>
+			  <TouchableOpacity
+				onPress={() => router.push('/ranking')}
+				activeOpacity={0.8}
+				style={{ flex: 1, paddingVertical: 14, borderRadius: 50, alignItems: 'center',
+				  justifyContent: 'center', backgroundColor: 'rgba(255,215,0,0.10)', borderWidth: 1,
+				  borderColor: 'rgba(255,215,0,0.4)', flexDirection: 'row', gap: 6 }}
+			  >
+				<Text style={{ fontSize: 16 }}>🏆</Text>
+				<Text style={{ color: '#FFD700', fontSize: 12, fontWeight: '800', letterSpacing: 1.5 }}>RANKING</Text>
+			  </TouchableOpacity>
 
+			  <TouchableOpacity
+				onPress={() => router.push('/perfil')}
+				activeOpacity={0.8}
+				style={{ flex: 1, paddingVertical: 14, borderRadius: 50, alignItems: 'center',
+				  justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1,
+				  borderColor: 'rgba(255,255,255,0.1)', flexDirection: 'row', gap: 6 }}
+			  >
+				<Text style={{ fontSize: 16 }}>👤</Text>
+				<Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, fontWeight: '700', letterSpacing: 1 }}>PERFIL</Text>
+			  </TouchableOpacity>
+			</View>
               {/* ─────────────────────────────────────────── */}
               {/* COMO JOGAR + OPÇÕES */}
               {/* ─────────────────────────────────────────── */}
