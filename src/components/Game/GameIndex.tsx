@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState } from "react";
 import {
   View,
-  TouchableWithoutFeedback,
+  PanResponder,
   Animated,
 } from "react-native";
 
@@ -23,7 +23,6 @@ import {
 } from "../../constants/gameConfig";
 
 import { useDailyCredits } from "../../hooks/useDailyCredits";
-import { useTiltSteering } from "../../hooks/useTiltSteering";
 
 import styles from "./styles";
 
@@ -138,80 +137,6 @@ export default function Game() {
       player;
   }, [player]);
 
-  // ============================================================
-  // SENSOR DE INCLINAÇÃO
-  // ============================================================
-
-  const tiltX =
-    useTiltSteering(!gameOver);
-
-  // ============================================================
-  // MOVIMENTO PELO SENSOR
-  //
-  // A nave NÃO responde ao toque.
-  //
-  // Somente a inclinação do celular movimenta a nave.
-  // ============================================================
-
-  useEffect(() => {
-    const TILT_SENSITIVITY = GAME_CONFIG.TILT_SENSITIVITY;
-    const MAX_BANK_ANGLE = GAME_CONFIG.TILT_MAX_BANK_ANGLE;
-
-    const interval =
-      setInterval(() => {
-        // Game Over
-        if (gameOverRef.current) {
-          return;
-        }
-
-        // Valor atual do sensor
-        const tilt =
-          tiltX.current;
-
-        // Posição atual da nave
-        const current =
-          playerRef.current;
-
-        // ======================================================
-        // MOVIMENTO HORIZONTAL
-        // ======================================================
-
-        const newX =
-          Math.max(
-            0,
-            Math.min(
-              WIDTH - 60,
-              current.x -
-                tilt *
-                  TILT_SENSITIVITY
-            )
-          );
-
-        // ======================================================
-        // INCLINAÇÃO VISUAL
-        // ======================================================
-
-        const newAngle =
-          -tilt *
-          MAX_BANK_ANGLE;
-
-        // ======================================================
-        // ATUALIZA PLAYER
-        // ======================================================
-
-        updatePlayerPosition(
-          newX,
-          current.y,
-          newAngle
-        );
-      }, 33);
-
-    return () => {
-      clearInterval(
-        interval
-      );
-    };
-  }, []);
 
   // ============================================================
   // EXPLOSÕES
@@ -343,19 +268,85 @@ export default function Game() {
     };
 
   // ============================================================
+  // MOVIMENTO PELO DEDO
+  //
+  // Arrastar em qualquer ponto da tela move a nave (a nave anda
+  // junto com o dedo, sem "pular" para baixo do dedo).
+  // Um toque rápido, sem arrastar, dá 1 disparo.
+  // ============================================================
+
+  const handleShootRef = useRef(handleShoot);
+  handleShootRef.current = handleShoot;
+
+  const dragStart = useRef({ x: 0, y: 0 });
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () =>
+        !gameOverRef.current,
+
+      onMoveShouldSetPanResponder: () =>
+        !gameOverRef.current,
+
+      onPanResponderGrant: () => {
+        dragStart.current = {
+          x: playerRef.current.x,
+          y: playerRef.current.y,
+        };
+      },
+
+      onPanResponderMove: (_, gesture) => {
+        if (gameOverRef.current) return;
+
+        const x = Math.max(
+          0,
+          Math.min(WIDTH - 90, dragStart.current.x + gesture.dx)
+        );
+        const y = Math.max(
+          0,
+          Math.min(HEIGHT - 90, dragStart.current.y + gesture.dy)
+        );
+
+        // Nave "curva" um pouco para o lado em que está indo
+        const angle = Math.max(
+          -30,
+          Math.min(30, gesture.vx * 20)
+        );
+
+        updatePlayerPosition(x, y, angle);
+      },
+
+      onPanResponderRelease: (_, gesture) => {
+        if (gameOverRef.current) return;
+
+        const current = playerRef.current;
+        updatePlayerPosition(current.x, current.y, 0);
+
+        // Toque rápido (quase sem mover) = 1 disparo
+        if (
+          Math.abs(gesture.dx) < 10 &&
+          Math.abs(gesture.dy) < 10
+        ) {
+          handleShootRef.current();
+        }
+      },
+
+      onPanResponderTerminate: () => {
+        const current = playerRef.current;
+        updatePlayerPosition(current.x, current.y, 0);
+      },
+    })
+  ).current;
+
+  // ============================================================
   // RENDER
   // ============================================================
 
   return (
-    <TouchableWithoutFeedback
-      onPress={handleShoot}
-      disabled={gameOver}
+    <View
+      style={styles.container}
+      {...panResponder.panHandlers}
     >
-      <View
-        style={
-          styles.container
-        }
-      >
 
         {/* ====================================================
             HUD
@@ -456,6 +447,5 @@ export default function Game() {
         />
 
       </View>
-    </TouchableWithoutFeedback>
   );
 }
