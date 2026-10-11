@@ -1,4 +1,4 @@
-import React, { memo, useEffect, useRef } from "react";
+import React, { memo, useEffect, useMemo, useRef } from "react";
 import {
   View,
   Text,
@@ -17,7 +17,12 @@ import {
   EnemyBullet,
   PowerUp,
   Boss,
+  Enemy,
+  Popup,
 } from "../../types/game";
+
+import { WIDTH, HEIGHT } from "../../constants/gameConfig";
+import { stageTint } from "../../game/stages";
 
 interface GameRendererProps {
   stars: Star[];
@@ -28,6 +33,9 @@ interface GameRendererProps {
   enemyBullets: EnemyBullet[];
   powerUps: PowerUp[];
   boss: Boss | null;
+  enemies: Enemy[];
+  popups: Popup[];
+  stage: number;
   explosions: Explosion[];
   shield: boolean;
   player: PlayerPosition;
@@ -200,6 +208,10 @@ const GlowBullet = memo(function GlowBullet({
 }: {
   bullet: Bullet;
 }) {
+  const w = bullet.w ?? 7;
+  const h = bullet.h ?? 15;
+  const color = bullet.color ?? "#00eeff";
+
   return (
     <View
       pointerEvents="none"
@@ -207,15 +219,15 @@ const GlowBullet = memo(function GlowBullet({
         position: "absolute",
         left: 0,
         top: 0,
-        width: 7,
-        height: 15,
-        borderRadius: 4,
-        backgroundColor: "#00eeff",
+        width: w,
+        height: h,
+        borderRadius: w / 2,
+        backgroundColor: color,
         borderWidth: 1,
-        borderColor: "rgba(120,230,255,0.7)",
+        borderColor: "rgba(255,255,255,0.65)",
         transform: [
-          { translateX: bullet.x - 2 },
-          { translateY: bullet.y - 4 },
+          { translateX: bullet.x - w / 2 },
+          { translateY: bullet.y - h / 2 },
         ],
       }}
     />
@@ -679,7 +691,7 @@ const PowerUpView = memo(function PowerUpView({
         width: 34,
         height: 34,
         borderRadius: 17,
-        backgroundColor: "#ff9500",
+        backgroundColor: p.kind === "B" ? "#1e88e5" : "#ff9500",
         borderWidth: 2,
         borderColor: "#ffffff",
         alignItems: "center",
@@ -695,10 +707,10 @@ const PowerUpView = memo(function PowerUpView({
         style={{
           color: "#ffffff",
           fontWeight: "900",
-          fontSize: 18,
+          fontSize: p.kind === "B" ? 16 : 18,
         }}
       >
-        P
+        {p.kind === "B" ? "💣" : "P"}
       </Text>
     </Animated.View>
   );
@@ -776,6 +788,214 @@ const BossView = memo(function BossView({
 
 /**
  * ============================================================
+ * INIMIGO
+ * ============================================================
+ */
+
+const EnemyView = memo(function EnemyView({ e }: { e: Enemy }) {
+  const showBar = e.maxHp > 3;
+
+  return (
+    <View
+      pointerEvents="none"
+      style={{
+        position: "absolute",
+        left: 0,
+        top: 0,
+        width: e.size,
+        height: e.size,
+        alignItems: "center",
+        justifyContent: "center",
+        transform: [
+          { translateX: e.x - e.size / 2 },
+          { translateY: e.y - e.size / 2 },
+        ],
+      }}
+    >
+      <Text
+        style={{
+          fontSize: e.size * 0.85,
+          lineHeight: e.size,
+          textAlign: "center",
+          opacity: e.flash > 0 ? 0.4 : 1,
+        }}
+      >
+        {e.emoji}
+      </Text>
+
+      {showBar && (
+        <View
+          style={{
+            position: "absolute",
+            top: -6,
+            width: e.size * 0.8,
+            height: 4,
+            borderRadius: 2,
+            backgroundColor: "rgba(0,0,0,0.55)",
+            overflow: "hidden",
+          }}
+        >
+          <View
+            style={{
+              width: `${Math.max(0, e.hp / e.maxHp) * 100}%`,
+              height: "100%",
+              backgroundColor: "#ff5252",
+            }}
+          />
+        </View>
+      )}
+    </View>
+  );
+});
+
+/**
+ * ============================================================
+ * PONTOS FLUTUANTES ("+100 x2")
+ * ============================================================
+ */
+
+const PopupView = memo(function PopupView({ p }: { p: Popup }) {
+  return (
+    <View
+      pointerEvents="none"
+      style={{
+        position: "absolute",
+        left: 0,
+        top: 0,
+        width: 80,
+        alignItems: "center",
+        opacity: Math.max(0, 1 - p.age / 24),
+        transform: [
+          { translateX: p.x - 40 },
+          { translateY: p.y - p.age * 1.8 },
+        ],
+      }}
+    >
+      <Text
+        style={{
+          fontSize: 13,
+          fontWeight: "900",
+          color: p.color,
+          textShadowColor: "rgba(0,0,0,0.85)",
+          textShadowRadius: 3,
+        }}
+      >
+        {p.text}
+      </Text>
+    </View>
+  );
+});
+
+/**
+ * ============================================================
+ * FUNDO ROLANDO (sensação de velocidade)
+ * ============================================================
+ *
+ * 3 camadas de estrelas descem em velocidades diferentes. É tudo
+ * animação nativa: não custa nada para o React.
+ */
+
+const STAR_LAYERS = [
+  { count: 14, ms: 6500, size: 2, alpha: 0.45 },
+  { count: 10, ms: 3800, size: 2.5, alpha: 0.7 },
+  { count: 6, ms: 2200, size: 3, alpha: 0.95 },
+];
+
+const ScrollingStars = memo(function ScrollingStars() {
+  const layers = useMemo(
+    () =>
+      STAR_LAYERS.map((l) =>
+        Array.from({ length: l.count }, () => ({
+          x: Math.random() * WIDTH,
+          y: Math.random() * HEIGHT,
+        }))
+      ),
+    []
+  );
+
+  const anims = useRef(
+    STAR_LAYERS.map(() => new Animated.Value(0))
+  ).current;
+
+  useEffect(() => {
+    const loops = anims.map((a, i) =>
+      Animated.loop(
+        Animated.timing(a, {
+          toValue: 1,
+          duration: STAR_LAYERS[i].ms,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        })
+      )
+    );
+
+    loops.forEach((l) => l.start());
+    return () => loops.forEach((l) => l.stop());
+  }, []);
+
+  return (
+    <>
+      {layers.map((dots, i) => (
+        <Animated.View
+          key={i}
+          pointerEvents="none"
+          style={{
+            position: "absolute",
+            left: 0,
+            top: 0,
+            width: WIDTH,
+            height: HEIGHT * 2,
+            transform: [
+              {
+                translateY: anims[i].interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [-HEIGHT, 0],
+                }),
+              },
+            ],
+          }}
+        >
+          {dots
+            .concat(dots.map((d) => ({ x: d.x, y: d.y + HEIGHT })))
+            .map((d, k) => (
+              <View
+                key={k}
+                style={{
+                  position: "absolute",
+                  left: d.x,
+                  top: d.y,
+                  width: STAR_LAYERS[i].size,
+                  height: STAR_LAYERS[i].size,
+                  borderRadius: 2,
+                  backgroundColor: `rgba(255,255,255,${STAR_LAYERS[i].alpha})`,
+                }}
+              />
+            ))}
+        </Animated.View>
+      ))}
+    </>
+  );
+});
+
+/** Cor de cada fase (camada translúcida sobre o fundo). */
+const StageTint = memo(function StageTint({ stage }: { stage: number }) {
+  return (
+    <View
+      pointerEvents="none"
+      style={{
+        position: "absolute",
+        left: 0,
+        top: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: stageTint(stage),
+      }}
+    />
+  );
+});
+
+/**
+ * ============================================================
  * GAME RENDERER
  * ============================================================
  */
@@ -789,6 +1009,9 @@ function GameRenderer({
   enemyBullets,
   powerUps,
   boss,
+  enemies,
+  popups,
+  stage,
   explosions,
   shield,
   player,
@@ -901,6 +1124,10 @@ function GameRenderer({
 
       <Nebula />
 
+      <StageTint stage={stage} />
+
+      <ScrollingStars />
+
       {/* ======================================================
           ESTRELAS
       ====================================================== */}
@@ -969,6 +1196,14 @@ function GameRenderer({
       )}
 
       {/* ======================================================
+          INIMIGOS
+      ====================================================== */}
+
+      {enemies.map((e) => (
+        <EnemyView key={e.id} e={e} />
+      ))}
+
+      {/* ======================================================
           CHEFÃO
       ====================================================== */}
 
@@ -1005,6 +1240,14 @@ function GameRenderer({
           />
         )
       )}
+
+      {/* ======================================================
+          PONTOS FLUTUANTES
+      ====================================================== */}
+
+      {popups.map((p) => (
+        <PopupView key={p.id} p={p} />
+      ))}
 
       {/* ======================================================
           SHIELD

@@ -10,7 +10,7 @@ export const SHIPS: Ship[] = [
     emoji: "🚀",
     image: require("../../assets/ships/nave-azul.png"),
     unlockScore: 0,
-    description: "Nave inicial.",
+    description: "Equilibrada: tiro duplo que vira leque.",
   },
 
   {
@@ -19,7 +19,7 @@ export const SHIPS: Ship[] = [
     emoji: "🛸",
     image: require("../../assets/ships/nave-vermelha.png"),
     unlockScore: 4000,
-    description: "Nave veloz e ágil.",
+    description: "Rápida: dispara muito mais rápido.",
   },
 
   {
@@ -28,7 +28,7 @@ export const SHIPS: Ship[] = [
     emoji: "☄️",
     image: require("../../assets/ships/nave-verde.png"),
     unlockScore: 8000,
-    description: "Nave pesada e resistente.",
+    description: "Pesada: tiros lentos com dano dobrado.",
   },
 
   {
@@ -37,7 +37,7 @@ export const SHIPS: Ship[] = [
     emoji: "👾",
     image: require("../../assets/ships/nave-roxa.png"),
     unlockScore: 12000,
-    description: "Nave experimental.",
+    description: "Teleguiada: mísseis que perseguem os inimigos.",
   },
 
   {
@@ -46,7 +46,7 @@ export const SHIPS: Ship[] = [
     emoji: "🌌",
     image: require("../../assets/ships/nave-rosa.png"),
     unlockScore: 16000,
-    description: "Nave rara.",
+    description: "Perfurante: laser que atravessa tudo.",
   },
 
   {
@@ -55,7 +55,7 @@ export const SHIPS: Ship[] = [
     emoji: "✨",
     image: require("../../assets/ships/nave-turquesa.png"),
     unlockScore: 20000,
-    description: "Nave lendária.",
+    description: "Mista: tiro reto e laterais teleguiados.",
   },
 ];
 

@@ -17,7 +17,7 @@
 // POST {API_URL}/scores
 //   Header: Authorization: Bearer <token>   (se o jogador tiver login)
 //   Body:   { gameId, clientScoreId, userId, name, score, coins,
-//             gems, shipId, createdAt }
+//             gems, shipId, stage, createdAt }
 //   Resp:   201 (ou 200 se clientScoreId já existir - idempotente)
 //
 // GET {API_URL}/scores?gameId=interestrelar&limit=50
@@ -131,6 +131,7 @@ async function sendToServer(
           coins: entry.coins,
           gems: entry.gems,
           shipId: entry.shipId,
+          stage: entry.stage,
           createdAt: entry.createdAt,
         }),
       },
@@ -178,6 +179,7 @@ export async function getGlobalRanking(
       coins: Number(item.coins) || 0,
       gems: Number(item.gems) || 0,
       shipId: item.shipId,
+      stage: item.stage ? Number(item.stage) : undefined,
       createdAt: Number(item.createdAt) || 0,
       synced: true,
     })
@@ -207,6 +209,7 @@ export async function submitScore(
     coins: Math.floor(input.coins),
     gems: Math.floor(input.gems),
     shipId: input.shipId,
+    stage: input.stage,
     createdAt: Date.now(),
     synced: false,
   };

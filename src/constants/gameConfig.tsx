@@ -11,12 +11,6 @@ export const OBSTACLE_TYPES = [
     drift: false,
   },
   {
-    emojis: ["👾", "👽", "🛸"],
-    fontSize: 34,
-    speedMult: 3.4,
-    drift: true,
-  },
-  {
     emojis: ["🪐", "🌍", "🌕"],
     fontSize: 48,
     speedMult: 0.9,
@@ -28,7 +22,7 @@ export const GAME_CONFIG = {
   SHOOT_INTERVAL: 200,           // 150 → 200 (mais leve)
   DOUBLE_TAP_DELAY: 300,
   SHIELD_DURATION: 8000,
-  OBSTACLE_COUNT: 5,             // 8 → 5 (menos obstáculos)
+  OBSTACLE_COUNT: 3,             // só asteroides e planetas (os inimigos vêm em ondas)
   STAR_COUNT: 50,                // 150 → 50 (muito mais leve)
   GAME_LOOP_INTERVAL: 60,        // 40 → 60 (loop mais lento = mais performance)
 
@@ -55,14 +49,33 @@ export const GAME_CONFIG = {
   MAX_WEAPON_LEVEL: 5,           // nível máximo do tiro
   POWERUP_DROP_CHANCE: 0.12,     // chance de um inimigo destruído soltar o "P"
   POWERUP_SPAWN_TICKS: 480,      // sem "P" por esse tempo (~29s) = cai um sozinho
-  SHOT_COOLDOWN_TICKS: 3,        // intervalo mínimo entre tiros (3 ticks ≈ 180ms)
-  MAX_BULLETS: 40,               // limite de tiros na tela (desempenho)
+  MAX_BULLETS: 64,               // limite de tiros na tela (desempenho)
   PLAYER_INVULN_TICKS: 20,       // invulnerável após tomar dano (~1,2s)
 
-  // Chefão
-  BOSS_FIRST_SCORE: 1500,        // pontuação do primeiro chefão
-  BOSS_SCORE_GAP: 3000,          // pontos entre um chefão derrotado e o próximo
-  BOSS_BASE_HP: 180,             // vida do 1º chefão
-  BOSS_HP_PER_LEVEL: 100,        // vida extra a cada chefão seguinte
+  // Colisão da nave (metade da largura/altura da área que pode ser atingida)
+  PLAYER_HIT_W: 9,
+  PLAYER_HIT_H: 13,
 
+  // Fases
+  STAGE_INTRO_TICKS: 36,         // pausa com "FASE N" antes das ondas
+  STAGE_CLEAR_TICKS: 60,         // pausa depois do chefão antes da próxima fase
+  BOSS_WARNING_TICKS: 36,        // "WARNING" antes do chefão entrar
+  MAX_ENEMIES: 14,               // inimigos na tela ao mesmo tempo (desempenho)
+
+  // Chefão e mini-chefe
+  BOSS_BASE_HP: 220,             // vida do chefão da fase 1
+  BOSS_HP_PER_LEVEL: 120,        // vida extra a cada fase
+  MID_BOSS_HP_FACTOR: 0.4,       // vida do mini-chefe = chefão x este valor
+
+  // Bombas
+  START_BOMBS: 2,
+  MAX_BOMBS: 5,
+  BOMB_ENEMY_DAMAGE: 15,         // dano da bomba em cada inimigo
+  BOMB_BOSS_DAMAGE_PCT: 0.1,     // dano da bomba no chefão (fração da vida máxima)
+  BOMB_INVULN_TICKS: 36,         // invulnerável depois da bomba (~2s)
+  BOMB_COOLDOWN_TICKS: 10,
+  BOMB_DROP_CHANCE: 0.05,        // chance de um inimigo soltar bomba "B"
+
+  // Combo: abater inimigos em sequência multiplica os pontos
+  COMBO_WINDOW_TICKS: 50,        // tempo (~3s) para manter a sequência
 };

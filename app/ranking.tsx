@@ -109,6 +109,7 @@ export default function RankingScreen() {
           </Text>
           <Text style={{ color: "rgba(180,210,255,0.55)", fontSize: 11 }}>
             💰 {item.coins}   💎 {item.gems}
+            {item.stage ? `   🚩 Fase ${item.stage}` : ""}
             {tab === "local" && serverOn
               ? item.synced
                 ? "   ☁️ enviado"

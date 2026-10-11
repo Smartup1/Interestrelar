@@ -23,6 +23,8 @@ export interface ScoreEntry {
   coins: number;
   gems: number;
   shipId?: string;
+  /** fase em que a partida terminou */
+  stage?: number;
   createdAt: number;
   /** true = o servidor já recebeu este resultado. */
   synced: boolean;
@@ -33,6 +35,7 @@ export interface SubmitScoreInput {
   coins: number;
   gems: number;
   shipId?: string;
+  stage?: number;
 }
 
 export interface SubmitScoreResult {

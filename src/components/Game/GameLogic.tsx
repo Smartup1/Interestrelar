@@ -17,6 +17,10 @@ import {
   PowerUp,
   Boss,
   Banner,
+  Enemy,
+  Popup,
+  FxEvent,
+  FxName,
 } from "../../types/game";
 
 import {
@@ -29,51 +33,37 @@ import {
   createInitialCollectibles,
 } from "../../utils/collectibles";
 
+import {
+  WeaponProfile,
+  getWeaponForShip,
+} from "../../game/weapons";
+
+import { createEnemy, updateEnemy } from "../../game/enemies";
+
+import { ScriptStep, buildStageScript } from "../../game/stages";
+
 /**
  * ============================================================
  * MULTIPLICADOR DE DIFICULDADE
  * ============================================================
- * 0 -> 1.0x ... 3500+ -> 1.7x (a cada 500 pontos +0.1)
  */
 function getSpeedMultiplier(score: number): number {
   return Math.min(1.0 + Math.floor(score / 500) * 0.1, 1.7);
 }
 
-/**
- * ============================================================
- * PADRÕES DE TIRO (estilo Aero Fighters)
- * ============================================================
- * Cada item: [deslocamento X em px a partir do centro da nave,
- *             velocidade lateral].
- * Índice 0 = nível 1 ... índice 4 = nível 5.
- */
-const SHOT_PATTERNS: [number, number][][] = [
-  // Nível 1: tiro duplo paralelo
-  [[-7, 0], [7, 0]],
-
-  // Nível 2: leque de 3
-  [[0, 0], [-10, -1.8], [10, 1.8]],
-
-  // Nível 3: duplo + 2 diagonais
-  [[-7, 0], [7, 0], [-14, -2.5], [14, 2.5]],
-
-  // Nível 4: leque de 5
-  [[0, 0], [-9, -1.5], [9, 1.5], [-16, -3.5], [16, 3.5]],
-
-  // Nível 5: 6 tiros (2 retos + 4 em leque)
-  [[-6, 0], [6, 0], [-12, -1.8], [12, 1.8], [-18, -3.8], [18, 3.8]],
-];
-
 const BOSS_EMOJIS = ["🛸", "👾", "🐙", "👹", "💀"];
+const MID_BOSS_EMOJIS = ["🛰️", "🤖", "🦂", "👺", "🧟"];
 
 const HALF = GAME_CONFIG.PLAYER_BOX / 2;
+const HIT_W = GAME_CONFIG.PLAYER_HIT_W;
+const HIT_H = GAME_CONFIG.PLAYER_HIT_H;
 
 /**
  * ============================================================
  * GAME LOGIC
  * ============================================================
  */
-export function useGameLogic() {
+export function useGameLogic(shipId?: string) {
   // ==========================================================
   // ESTADOS PRINCIPAIS
   // ==========================================================
@@ -86,7 +76,10 @@ export function useGameLogic() {
   const [gameOver, setGameOver] = useState(false);
   const [shield, setShield] = useState(false);
   const [weaponLevel, setWeaponLevel] = useState(1);
+  const [bombs, setBombs] = useState(GAME_CONFIG.START_BOMBS);
+  const [stage, setStage] = useState(1);
   const [banner, setBanner] = useState<Banner | null>(null);
+  const [fx, setFx] = useState<FxEvent[]>([]);
 
   // ==========================================================
   // ENTIDADES DO JOGO
@@ -95,7 +88,9 @@ export function useGameLogic() {
   const [bullets, setBullets] = useState<Bullet[]>([]);
   const [enemyBullets, setEnemyBullets] = useState<EnemyBullet[]>([]);
   const [powerUps, setPowerUps] = useState<PowerUp[]>([]);
+  const [enemies, setEnemies] = useState<Enemy[]>([]);
   const [boss, setBoss] = useState<Boss | null>(null);
+  const [popups, setPopups] = useState<Popup[]>([]);
   const [explosions, setExplosions] = useState<Explosion[]>([]);
   const [trail, setTrail] = useState<Trail[]>([]);
   const [obstacles, setObstacles] = useState<Obstacle[]>([]);
@@ -117,9 +112,12 @@ export function useGameLogic() {
 
   const bulletId = useRef(0);
   const enemyBulletId = useRef(0);
+  const enemyId = useRef(0);
   const powerUpId = useRef(0);
+  const popupId = useRef(0);
   const bossId = useRef(0);
   const bannerId = useRef(0);
+  const fxSeq = useRef(0);
   const explosionId = useRef(0);
   const obstacleId = useRef(100);
   const collectibleId = useRef(1000);
@@ -143,18 +141,39 @@ export function useGameLogic() {
   const shieldRef = useRef(false);
   const gameOverRef = useRef(false);
 
+  // Arma
+  const weaponRef = useRef<WeaponProfile>(getWeaponForShip(shipId));
   const weaponLevelRef = useRef(1);
   const lastShotTick = useRef(-10);
-  const invulnUntil = useRef(0);
-  const lastPowerTick = useRef(0);
 
+  // Bombas
+  const bombsRef = useRef(GAME_CONFIG.START_BOMBS);
+  const bombPending = useRef(false);
+  const lastBombTick = useRef(-100);
+
+  // Combate
+  const invulnUntil = useRef(0);
+  const lastKillTick = useRef(0);
+  const lastPowerTick = useRef(0);
+  const lastBombItemTick = useRef(0);
+
+  // Fases
+  const stageRef = useRef(1);
+  const stageTickRef = useRef(-GAME_CONFIG.STAGE_INTRO_TICKS);
+  const scriptRef = useRef<ScriptStep[]>(buildStageScript(1, WIDTH));
+  const scriptIdx = useRef(0);
+  const stagePhase = useRef<"play" | "clear">("play");
+  const clearTimer = useRef(0);
+  const bossPending = useRef<{ ticks: number; mid: boolean } | null>(null);
   const bossRef = useRef<Boss | null>(null);
-  const bossCountRef = useRef(0);
-  const nextBossScore = useRef(GAME_CONFIG.BOSS_FIRST_SCORE);
+
+  const fxQueue = useRef<FxName[]>([]);
 
   const bulletsRef = useRef<Bullet[]>([]);
   const enemyBulletsRef = useRef<EnemyBullet[]>([]);
+  const enemiesRef = useRef<Enemy[]>([]);
   const powerUpsRef = useRef<PowerUp[]>([]);
+  const popupsRef = useRef<Popup[]>([]);
   const explosionsRef = useRef<Explosion[]>([]);
   const obstaclesRef = useRef<Obstacle[]>([]);
   const collectiblesRef = useRef<Collectible[]>([]);
@@ -171,8 +190,13 @@ export function useGameLogic() {
     gameOverRef.current = gameOver;
   }, [gameOver]);
 
+  // A arma depende da nave escolhida
+  useEffect(() => {
+    weaponRef.current = getWeaponForShip(shipId);
+  }, [shipId]);
+
   // ==========================================================
-  // AVISO NA TELA ("POWER UP!", "CHEFÃO!"...)
+  // AVISO NA TELA ("FASE 1", "WARNING!"...)
   // ==========================================================
 
   function showBanner(text: string, ms = 1600) {
@@ -181,6 +205,40 @@ export function useGameLogic() {
     setTimeout(() => {
       if (bannerId.current === id) setBanner(null);
     }, ms);
+  }
+
+  // ==========================================================
+  // CHEFÃO / MINI-CHEFE
+  // ==========================================================
+
+  function makeBoss(isMid: boolean, tick: number): Boss {
+    const level = stageRef.current;
+
+    const baseHp =
+      GAME_CONFIG.BOSS_BASE_HP +
+      GAME_CONFIG.BOSS_HP_PER_LEVEL * (level - 1);
+
+    const hp = Math.round(
+      isMid ? baseHp * GAME_CONFIG.MID_BOSS_HP_FACTOR : baseHp
+    );
+
+    const size = isMid ? 84 : Math.min(150, 110 + (level - 1) * 8);
+    const list = isMid ? MID_BOSS_EMOJIS : BOSS_EMOJIS;
+
+    return {
+      id: bossId.current++,
+      x: WIDTH / 2,
+      y: -size,
+      hp,
+      maxHp: hp,
+      level,
+      emoji: list[(level - 1) % list.length],
+      size,
+      spawnTick: tick,
+      wave: 0,
+      hitFlash: 0,
+      isMid,
+    };
   }
 
   // ==========================================================
@@ -198,6 +256,8 @@ export function useGameLogic() {
 
     setObstacles(initialObstacles);
     setCollectibles(initialCollectibles);
+
+    showBanner("FASE 1", 2000);
   }, []);
 
   // ==========================================================
@@ -205,7 +265,7 @@ export function useGameLogic() {
   // ==========================================================
 
   useEffect(() => {
-    /** Tira uma vida (com proteção de escudo e invulnerabilidade). */
+    /** Tira uma vida (com escudo e invulnerabilidade). */
     const hurtPlayer = () => {
       if (shieldRef.current) return;
       if (tickRef.current < invulnUntil.current) return;
@@ -216,7 +276,15 @@ export function useGameLogic() {
       livesRef.current -= 1;
       setLives(livesRef.current);
 
-      // Perde 1 nível de tiro ao ser atingido
+      fxQueue.current.push("hurt");
+
+      // Perde a sequência de combo
+      if (comboRef.current > 0) {
+        comboRef.current = 0;
+        setCombo(0);
+      }
+
+      // Perde 1 nível de tiro
       if (weaponLevelRef.current > 1) {
         weaponLevelRef.current -= 1;
         setWeaponLevel(weaponLevelRef.current);
@@ -233,183 +301,501 @@ export function useGameLogic() {
 
       tickRef.current++;
       const tick = tickRef.current;
+      const stage = stageRef.current;
 
-      // Score automático
       scoreRef.current += 1;
       const speedMult = getSpeedMultiplier(scoreRef.current);
+
+      // Sequência de combo expira
+      if (
+        comboRef.current > 0 &&
+        tick - lastKillTick.current > GAME_CONFIG.COMBO_WINDOW_TICKS
+      ) {
+        comboRef.current = 0;
+        setCombo(0);
+      }
+
+      const mult = Math.min(
+        4,
+        1 + Math.floor(comboRef.current / 6) * 0.5
+      );
 
       // Centro da nave
       const pcx = playerRef.current.x + HALF;
       const pcy = playerRef.current.y + HALF;
 
-      let comboIncrease = 0;
+      const weapon = weaponRef.current;
+
       const newExplosions: Explosion[] = [];
       const newPowerUps: PowerUp[] = [];
+      const newPopups: Popup[] = [];
+
       let nextObstacles = obstaclesRef.current.slice();
+      let nextEnemies: (Enemy | null)[] = enemiesRef.current.slice();
       const nextBullets: Bullet[] = [];
 
-      const addPowerUp = (x: number, y: number) => {
+      let boss = bossRef.current;
+      let bossDefeated = false;
+
+      // ------------------------------------------------------
+      // Ajudantes
+      // ------------------------------------------------------
+
+      const explode = (x: number, y: number) => {
+        newExplosions.push({ id: explosionId.current++, x, y });
+      };
+
+      const popup = (
+        x: number,
+        y: number,
+        text: string,
+        color = "#ffd700"
+      ) => {
+        newPopups.push({
+          id: popupId.current++,
+          x,
+          y,
+          text,
+          color,
+          age: 0,
+        });
+      };
+
+      const addScore = (base: number, x: number, y: number) => {
+        const v = Math.round(base * mult);
+        scoreRef.current += v;
+        popup(
+          x,
+          y - 10,
+          mult > 1 ? `+${v} x${mult}` : `+${v}`,
+          mult > 1 ? "#ff9f1a" : "#ffd700"
+        );
+      };
+
+      const registerKill = () => {
+        comboRef.current += 1;
+        lastKillTick.current = tick;
+      };
+
+      const addPowerUp = (x: number, y: number, kind: "P" | "B") => {
         newPowerUps.push({
           id: powerUpId.current++,
           x,
           y,
           speed: 4,
+          kind,
         });
-        lastPowerTick.current = tick;
+        if (kind === "P") lastPowerTick.current = tick;
+        else lastBombItemTick.current = tick;
+      };
+
+      const dropFor = (e: Enemy) => {
+        const needP =
+          weaponLevelRef.current < GAME_CONFIG.MAX_WEAPON_LEVEL;
+        const needB = bombsRef.current < GAME_CONFIG.MAX_BOMBS;
+
+        // O grandalhão sempre solta um item
+        if (e.kind === "heavy") {
+          if (needP) addPowerUp(e.x, e.y, "P");
+          else if (needB) addPowerUp(e.x, e.y, "B");
+          return;
+        }
+
+        if (needP && Math.random() < GAME_CONFIG.POWERUP_DROP_CHANCE) {
+          addPowerUp(e.x, e.y, "P");
+        } else if (
+          needB &&
+          Math.random() < GAME_CONFIG.BOMB_DROP_CHANCE
+        ) {
+          addPowerUp(e.x, e.y, "B");
+        }
+      };
+
+      const killEnemy = (idx: number) => {
+        const e = nextEnemies[idx];
+        if (!e) return;
+        addScore(e.score, e.x, e.y);
+        registerKill();
+        explode(e.x, e.y);
+        dropFor(e);
+        nextEnemies[idx] = null;
+      };
+
+      const hitEnemy = (idx: number, dmg: number) => {
+        const e = nextEnemies[idx];
+        if (!e) return;
+        const hp = e.hp - dmg;
+        if (hp <= 0) killEnemy(idx);
+        else nextEnemies[idx] = { ...e, hp, flash: 3 };
+      };
+
+      const killObstacle = (i: number) => {
+        const o = nextObstacles[i];
+        const ocx = o.x + o.fontSize / 2;
+        const ocy = o.y + o.fontSize / 2;
+
+        addScore(50, ocx, ocy);
+        registerKill();
+        explode(ocx, ocy);
+
+        if (
+          weaponLevelRef.current < GAME_CONFIG.MAX_WEAPON_LEVEL &&
+          Math.random() < GAME_CONFIG.POWERUP_DROP_CHANCE * 0.5
+        ) {
+          addPowerUp(ocx, ocy, "P");
+        }
+
+        nextObstacles[i] = randomObstacle(obstacleId.current++);
       };
 
       // ======================================================
-      // 0. NASCIMENTO DO CHEFÃO
+      // 0. BOMBA
       // ======================================================
 
-      let boss = bossRef.current;
+      if (bombPending.current) {
+        bombPending.current = false;
 
-      if (!boss && scoreRef.current >= nextBossScore.current) {
-        const level = bossCountRef.current + 1;
-        const size = Math.min(150, 110 + (level - 1) * 8);
-        const hp =
-          GAME_CONFIG.BOSS_BASE_HP +
-          GAME_CONFIG.BOSS_HP_PER_LEVEL * (level - 1);
+        enemyBulletsRef.current = [];
 
-        boss = {
-          id: bossId.current++,
-          x: WIDTH / 2,
-          y: -size,
-          hp,
-          maxHp: hp,
-          level,
-          emoji: BOSS_EMOJIS[(level - 1) % BOSS_EMOJIS.length],
-          size,
-          spawnTick: tick,
-          wave: 0,
-          hitFlash: 0,
-        };
+        for (let i = 0; i < nextObstacles.length; i++) {
+          if (nextObstacles[i].y > -10) killObstacle(i);
+        }
 
-        showBanner("⚠️ CHEFÃO!", 2200);
+        for (let i = 0; i < nextEnemies.length; i++) {
+          if (nextEnemies[i]) hitEnemy(i, GAME_CONFIG.BOMB_ENEMY_DAMAGE);
+        }
+
+        if (boss && boss.y > -boss.size * 0.3) {
+          const dmg = Math.max(
+            25,
+            Math.round(boss.maxHp * GAME_CONFIG.BOMB_BOSS_DAMAGE_PCT)
+          );
+          boss = { ...boss, hp: boss.hp - dmg, hitFlash: 3 };
+          if (boss.hp <= 0) bossDefeated = true;
+        }
+
+        invulnUntil.current = Math.max(
+          invulnUntil.current,
+          tick + GAME_CONFIG.BOMB_INVULN_TICKS
+        );
+
+        fxQueue.current.push("bomb");
       }
 
       // ======================================================
-      // 1. TIROS DO JOGADOR
+      // 1. ROTEIRO DA FASE
       // ======================================================
 
-      let bossDefeated = false;
+      if (bossPending.current && !boss) {
+        bossPending.current.ticks -= 1;
+        if (bossPending.current.ticks <= 0) {
+          boss = makeBoss(bossPending.current.mid, tick);
+          bossPending.current = null;
+        }
+      }
+
+      if (stagePhase.current === "clear") {
+        clearTimer.current -= 1;
+
+        if (clearTimer.current <= 0) {
+          const ns = stageRef.current + 1;
+          stageRef.current = ns;
+          setStage(ns);
+
+          scriptRef.current = buildStageScript(ns, WIDTH);
+          scriptIdx.current = 0;
+          stageTickRef.current = -GAME_CONFIG.STAGE_INTRO_TICKS;
+          stagePhase.current = "play";
+
+          showBanner(`FASE ${ns}`, 2000);
+        }
+      } else {
+        // O relógio da fase para enquanto há chefão
+        const blocked = !!boss || !!bossPending.current;
+
+        if (!blocked) stageTickRef.current += 1;
+
+        const script = scriptRef.current;
+
+        while (
+          !blocked &&
+          scriptIdx.current < script.length &&
+          script[scriptIdx.current].at <= stageTickRef.current
+        ) {
+          const step = script[scriptIdx.current];
+
+          if (step.type === "spawn") {
+            const alive = nextEnemies.filter(Boolean).length;
+            if (alive >= GAME_CONFIG.MAX_ENEMIES) break;
+
+            nextEnemies.push(
+              createEnemy(
+                enemyId.current++,
+                step.kind!,
+                stage,
+                {
+                  x: step.x ?? WIDTH / 2,
+                  y: step.y,
+                  dir: step.dir,
+                  phase: step.phase,
+                },
+                WIDTH
+              )
+            );
+            scriptIdx.current++;
+          } else {
+            const mid = step.type === "midboss";
+
+            bossPending.current = {
+              ticks: GAME_CONFIG.BOSS_WARNING_TICKS,
+              mid,
+            };
+
+            showBanner(mid ? "⚠️ ATENÇÃO!" : "⚠️ WARNING!", 2000);
+            fxQueue.current.push("warning");
+
+            scriptIdx.current++;
+            break;
+          }
+        }
+      }
+
+      // ======================================================
+      // 2. TIROS DO JOGADOR
+      // ======================================================
 
       for (const bullet of bulletsRef.current) {
-        const nx = bullet.x + bullet.vx;
-        const ny = bullet.y + bullet.vy;
+        let vx = bullet.vx;
+        let vy = bullet.vy;
 
-        if (nx < -20 || nx > WIDTH + 20 || ny < -20 || ny > HEIGHT + 20) {
+        // Tiro teleguiado: curva em direção ao alvo mais próximo
+        if (bullet.homing) {
+          let tx = 0;
+          let ty = 0;
+          let best = 1e9;
+          let found = false;
+
+          for (const e of nextEnemies) {
+            if (!e || e.y < -10 || e.y > bullet.y + 30) continue;
+            const d = Math.hypot(e.x - bullet.x, e.y - bullet.y);
+            if (d < best) {
+              best = d;
+              tx = e.x;
+              ty = e.y;
+              found = true;
+            }
+          }
+
+          if (boss && boss.y > 0 && boss.y < bullet.y + 30) {
+            const d = Math.hypot(boss.x - bullet.x, boss.y - bullet.y);
+            if (d < best) {
+              best = d;
+              tx = boss.x;
+              ty = boss.y;
+              found = true;
+            }
+          }
+
+          if (found) {
+            const sp = weapon.speed;
+            const dx = tx - bullet.x;
+            const dy = ty - bullet.y;
+            const d = Math.hypot(dx, dy) || 1;
+
+            vx += ((dx / d) * sp - vx) * 0.22;
+            vy += ((dy / d) * sp - vy) * 0.22;
+
+            const m = Math.hypot(vx, vy) || 1;
+            vx = (vx / m) * sp;
+            vy = (vy / m) * sp;
+          }
+        }
+
+        const nx = bullet.x + vx;
+        const ny = bullet.y + vy;
+
+        if (nx < -30 || nx > WIDTH + 30 || ny < -40 || ny > HEIGHT + 20) {
           continue;
         }
 
-        const bcx = nx + 1.5;
-        let hit = false;
+        const bw = (bullet.w ?? 7) / 2;
+        const dmg = bullet.damage ?? 1;
+        const hitList = bullet.hit ? bullet.hit.slice() : [];
+        let consumed = false;
 
-        // Obstáculos
-        for (let i = 0; i < nextObstacles.length && !hit; i++) {
+        // Asteroides e planetas
+        for (let i = 0; i < nextObstacles.length && !consumed; i++) {
           const o = nextObstacles[i];
+          const key = 100000 + o.id;
+          if (hitList.includes(key)) continue;
+
           const ocx = o.x + o.fontSize / 2;
           const ocy = o.y + o.fontSize / 2;
 
           if (
-            Math.abs(ocx - bcx) < o.fontSize / 2 + 8 &&
+            Math.abs(ocx - nx) < o.fontSize / 2 + bw + 4 &&
             Math.abs(ocy - ny) < o.fontSize / 2 + 10
           ) {
-            hit = true;
-            scoreRef.current += 50;
-            comboIncrease += 1;
-
-            newExplosions.push({
-              id: explosionId.current++,
-              x: ocx,
-              y: ocy,
-            });
-
-            if (
-              weaponLevelRef.current < GAME_CONFIG.MAX_WEAPON_LEVEL &&
-              Math.random() < GAME_CONFIG.POWERUP_DROP_CHANCE
-            ) {
-              addPowerUp(ocx, ocy);
-            }
-
-            nextObstacles[i] = randomObstacle(obstacleId.current++);
+            hitList.push(key);
+            killObstacle(i);
+            if (!bullet.pierce) consumed = true;
           }
         }
 
-        // Chefão
-        if (!hit && boss && !bossDefeated && boss.y > -boss.size * 0.2) {
+        // Inimigos
+        for (let i = 0; i < nextEnemies.length && !consumed; i++) {
+          const e = nextEnemies[i];
+          if (!e) continue;
+
+          const key = 200000 + e.id;
+          if (hitList.includes(key)) continue;
+
           if (
-            Math.abs(bcx - boss.x) < boss.size * 0.45 &&
+            Math.abs(e.x - nx) < e.size * 0.45 + bw &&
+            Math.abs(e.y - ny) < e.size * 0.45 + 8
+          ) {
+            hitList.push(key);
+            hitEnemy(i, dmg);
+            if (!bullet.pierce) consumed = true;
+          }
+        }
+
+        // Chefão / mini-chefe
+        if (!consumed && boss && !bossDefeated && boss.y > -boss.size * 0.2) {
+          const key = 300000 + boss.id;
+
+          if (
+            !hitList.includes(key) &&
+            Math.abs(nx - boss.x) < boss.size * 0.45 + bw &&
             Math.abs(ny - boss.y) < boss.size * 0.45
           ) {
-            hit = true;
-            boss = { ...boss, hp: boss.hp - 1, hitFlash: 3 };
+            hitList.push(key);
+            boss = { ...boss, hp: boss.hp - dmg, hitFlash: 3 };
             scoreRef.current += 2;
 
-            if (boss.hp % 6 === 0) {
-              newExplosions.push({
-                id: explosionId.current++,
-                x: bcx,
-                y: ny,
-              });
-            }
-
+            if (Math.random() < 0.15) explode(nx, ny);
             if (boss.hp <= 0) bossDefeated = true;
+            if (!bullet.pierce) consumed = true;
           }
         }
 
-        if (!hit) {
-          nextBullets.push({ ...bullet, x: nx, y: ny });
+        if (!consumed) {
+          nextBullets.push({
+            ...bullet,
+            x: nx,
+            y: ny,
+            vx,
+            vy,
+            hit: bullet.pierce ? hitList : undefined,
+          });
         }
       }
 
       bulletsRef.current = nextBullets;
 
-      // ------------------------------------------------------
-      // Chefão derrotado
-      // ------------------------------------------------------
+      // ======================================================
+      // 3. CHEFÃO DERROTADO
+      // ======================================================
 
       if (boss && bossDefeated) {
-        const bonus = 1000 * boss.level;
+        const wasMid = boss.isMid;
+        const bonus = (wasMid ? 500 : 1000) * stage;
+
         scoreRef.current += bonus;
-        comboIncrease += 5;
+        popup(boss.x, boss.y, `+${bonus}`, "#ffffff");
+
+        comboRef.current += 5;
+        lastKillTick.current = tick;
 
         for (let k = 0; k < 5; k++) {
-          newExplosions.push({
-            id: explosionId.current++,
-            x: boss.x + (k - 2) * boss.size * 0.22,
-            y: boss.y + (k % 2 ? 1 : -1) * boss.size * 0.2,
-          });
+          explode(
+            boss.x + (k - 2) * boss.size * 0.22,
+            boss.y + (k % 2 ? 1 : -1) * boss.size * 0.2
+          );
         }
 
-        addPowerUp(boss.x, boss.y);
-
-        bossCountRef.current += 1;
-        nextBossScore.current =
-          scoreRef.current + GAME_CONFIG.BOSS_SCORE_GAP;
+        addPowerUp(
+          boss.x,
+          boss.y,
+          weaponLevelRef.current < GAME_CONFIG.MAX_WEAPON_LEVEL ? "P" : "B"
+        );
 
         enemyBulletsRef.current = [];
-        showBanner(`CHEFÃO DERROTADO! +${bonus}`, 2600);
+        fxQueue.current.push("bossdead");
+
+        if (wasMid) {
+          showBanner("MINI-CHEFE DERROTADO!", 2200);
+        } else {
+          // Fim da fase: o que sobrou explode
+          nextEnemies.forEach((e, i) => {
+            if (e && i < 4) explode(e.x, e.y);
+          });
+          nextEnemies = [];
+
+          bombsRef.current = Math.min(
+            GAME_CONFIG.MAX_BOMBS,
+            bombsRef.current + 1
+          );
+          setBombs(bombsRef.current);
+
+          stagePhase.current = "clear";
+          clearTimer.current = GAME_CONFIG.STAGE_CLEAR_TICKS;
+
+          showBanner(`FASE ${stage} COMPLETA!  +${bonus}`, 2600);
+          fxQueue.current.push("stageclear");
+        }
 
         boss = null;
       }
 
-      // ------------------------------------------------------
-      // Combo
-      // ------------------------------------------------------
-
-      if (comboIncrease > 0) {
-        comboRef.current += comboIncrease;
-        setCombo(comboRef.current);
-      }
+      // Combo (HUD)
+      setCombo(comboRef.current);
 
       // ======================================================
-      // 2. OBSTÁCULOS
+      // 4. INIMIGOS
+      // ======================================================
+
+      const enemyNew: EnemyBullet[] = [];
+      const ctx = { W: WIDTH, H: HEIGHT, px: pcx, py: pcy, stage };
+      const survivors: Enemy[] = [];
+
+      for (const e of nextEnemies) {
+        if (!e) continue;
+
+        const r = updateEnemy(e, ctx);
+
+        for (const s of r.shots) {
+          enemyNew.push({
+            id: enemyBulletId.current++,
+            x: s.x,
+            y: s.y,
+            vx: s.vx,
+            vy: s.vy,
+          });
+        }
+
+        if (!r.enemy) continue;
+        const ne = r.enemy;
+
+        // Encostar no inimigo machuca
+        if (
+          Math.abs(ne.x - pcx) < ne.size * 0.4 + HIT_W &&
+          Math.abs(ne.y - pcy) < ne.size * 0.4 + HIT_H
+        ) {
+          hurtPlayer();
+        }
+
+        survivors.push(ne);
+      }
+
+      enemiesRef.current = survivors;
+
+      // ======================================================
+      // 5. OBSTÁCULOS (asteroides e planetas)
       // ======================================================
 
       nextObstacles = nextObstacles.map((o) => {
-        // Enquanto há chefão, os obstáculos que ainda não entraram
-        // na tela ficam parados lá em cima.
+        // Com chefão na tela, os que ainda não entraram esperam
         if (boss && o.y < 0) return o;
 
         const nx = o.drift
@@ -426,8 +812,8 @@ export function useGameLogic() {
         const ocy = ny + o.fontSize / 2;
 
         if (
-          Math.abs(ocx - pcx) < o.fontSize / 2 + 16 &&
-          Math.abs(ocy - pcy) < o.fontSize / 2 + 28
+          Math.abs(ocx - pcx) < o.fontSize * 0.4 + HIT_W &&
+          Math.abs(ocy - pcy) < o.fontSize * 0.4 + HIT_H
         ) {
           hurtPlayer();
           return randomObstacle(obstacleId.current++);
@@ -439,10 +825,8 @@ export function useGameLogic() {
       obstaclesRef.current = nextObstacles;
 
       // ======================================================
-      // 3. CHEFÃO: MOVIMENTO E ATAQUES
+      // 6. CHEFÃO: MOVIMENTO E ATAQUES
       // ======================================================
-
-      const enemyNew: EnemyBullet[] = [];
 
       if (boss) {
         const targetY = 100 + boss.size / 2;
@@ -470,21 +854,20 @@ export function useGameLogic() {
           hitFlash: Math.max(0, boss.hitFlash - 1),
         };
 
-        // Ataques
         if (entered) {
           const bt = tick - boss.spawnTick;
-          const every = Math.max(
-            14,
-            (phase2 ? 24 : 36) - boss.level * 2
-          );
+          const every =
+            Math.max(14, (phase2 ? 24 : 36) - boss.level * 2) +
+            (boss.isMid ? 6 : 0);
 
           if (bt % every === 0) {
             const n = Math.floor(bt / every);
             const sx = boss.x;
             const sy = boss.y + boss.size * 0.4;
             const speed = 6.5 + Math.min(boss.level, 4) * 0.5;
+            const pattern = n % 3;
 
-            if (phase2 && n % 2 === 1) {
+            if (phase2 && pattern === 1) {
               // Mirado no jogador + 2 laterais
               const dx = pcx - sx;
               const dy = pcy - sy;
@@ -501,12 +884,27 @@ export function useGameLogic() {
                   vy: uy,
                 });
               });
+            } else if (
+              phase2 &&
+              pattern === 2 &&
+              boss.level >= 2 &&
+              !boss.isMid
+            ) {
+              // Anel de tiros
+              for (let k = 0; k < 12; k++) {
+                const ang = (k / 12) * Math.PI * 2 + n * 0.2;
+                enemyNew.push({
+                  id: enemyBulletId.current++,
+                  x: sx,
+                  y: sy,
+                  vx: Math.sin(ang) * 5.2,
+                  vy: Math.cos(ang) * 5.2,
+                });
+              }
             } else {
-              // Leque (3 tiros; 5 a partir do chefão nível 2)
+              // Leque (3 tiros; 5 a partir da fase 2)
               const spread =
-                boss.level >= 2
-                  ? [-3, -1.5, 0, 1.5, 3]
-                  : [-2, 0, 2];
+                boss.level >= 2 ? [-3, -1.5, 0, 1.5, 3] : [-2, 0, 2];
 
               spread.forEach((vx) => {
                 enemyNew.push({
@@ -523,8 +921,8 @@ export function useGameLogic() {
 
         // Encostar no chefão machuca
         if (
-          Math.abs(pcx - boss.x) < boss.size * 0.4 + 14 &&
-          Math.abs(pcy - boss.y) < boss.size * 0.4 + 24
+          Math.abs(pcx - boss.x) < boss.size * 0.4 + HIT_W &&
+          Math.abs(pcy - boss.y) < boss.size * 0.4 + HIT_H
         ) {
           hurtPlayer();
         }
@@ -533,10 +931,10 @@ export function useGameLogic() {
       bossRef.current = boss;
 
       // ======================================================
-      // 4. TIROS INIMIGOS
+      // 7. TIROS INIMIGOS
       // ======================================================
 
-      const nextEnemy: EnemyBullet[] = [];
+      const nextEnemyBullets: EnemyBullet[] = [];
 
       for (const e of [...enemyBulletsRef.current, ...enemyNew]) {
         const nx = e.x + e.vx;
@@ -546,27 +944,38 @@ export function useGameLogic() {
           continue;
         }
 
-        if (Math.abs(nx - pcx) < 18 && Math.abs(ny - pcy) < 30) {
+        if (
+          Math.abs(nx - pcx) < HIT_W + 6 &&
+          Math.abs(ny - pcy) < HIT_H + 6
+        ) {
           hurtPlayer();
           continue;
         }
 
-        nextEnemy.push({ ...e, x: nx, y: ny });
+        nextEnemyBullets.push({ ...e, x: nx, y: ny });
       }
 
-      enemyBulletsRef.current = nextEnemy;
+      enemyBulletsRef.current = nextEnemyBullets;
 
       // ======================================================
-      // 5. ITENS "P" (NÍVEL DE TIRO)
+      // 8. ITENS "P" (tiro) E "B" (bomba)
       // ======================================================
 
-      // Cai um "P" sozinho se ficou muito tempo sem aparecer
-      if (
-        !boss &&
-        weaponLevelRef.current < GAME_CONFIG.MAX_WEAPON_LEVEL &&
-        tick - lastPowerTick.current > GAME_CONFIG.POWERUP_SPAWN_TICKS
-      ) {
-        addPowerUp(30 + Math.random() * (WIDTH - 60), -30);
+      if (!boss && !bossPending.current) {
+        if (
+          weaponLevelRef.current < GAME_CONFIG.MAX_WEAPON_LEVEL &&
+          tick - lastPowerTick.current > GAME_CONFIG.POWERUP_SPAWN_TICKS
+        ) {
+          addPowerUp(30 + Math.random() * (WIDTH - 60), -30, "P");
+        }
+
+        if (
+          bombsRef.current < 2 &&
+          tick - lastBombItemTick.current >
+            GAME_CONFIG.POWERUP_SPAWN_TICKS * 2
+        ) {
+          addPowerUp(30 + Math.random() * (WIDTH - 60), -30, "B");
+        }
       }
 
       const nextPowerUps: PowerUp[] = [];
@@ -577,13 +986,28 @@ export function useGameLogic() {
         if (ny > HEIGHT + 40) continue;
 
         if (Math.abs(p.x - pcx) < 34 && Math.abs(ny - pcy) < 44) {
-          if (weaponLevelRef.current < GAME_CONFIG.MAX_WEAPON_LEVEL) {
+          if (p.kind === "B") {
+            if (bombsRef.current < GAME_CONFIG.MAX_BOMBS) {
+              bombsRef.current += 1;
+              setBombs(bombsRef.current);
+              popup(p.x, ny, "💣 +1", "#9ad7ff");
+              fxQueue.current.push("bombpickup");
+            } else {
+              scoreRef.current += 300;
+              popup(p.x, ny, "+300", "#ffd700");
+              fxQueue.current.push("bombpickup");
+            }
+          } else if (
+            weaponLevelRef.current < GAME_CONFIG.MAX_WEAPON_LEVEL
+          ) {
             weaponLevelRef.current += 1;
             setWeaponLevel(weaponLevelRef.current);
             showBanner(`⚡ TIRO NÍVEL ${weaponLevelRef.current}`, 1500);
+            fxQueue.current.push("powerup");
           } else {
             scoreRef.current += 500;
             showBanner("TIRO MÁXIMO! +500", 1300);
+            fxQueue.current.push("powerup");
           }
           continue;
         }
@@ -594,7 +1018,7 @@ export function useGameLogic() {
       powerUpsRef.current = nextPowerUps;
 
       // ======================================================
-      // 6. MOEDAS E GEMAS
+      // 9. MOEDAS E GEMAS
       // ======================================================
 
       const nextCollectibles = collectiblesRef.current.map((c) => {
@@ -604,6 +1028,8 @@ export function useGameLogic() {
           Math.abs(c.x + 16 - pcx) < 40 &&
           Math.abs(ny + 16 - pcy) < 46
         ) {
+          fxQueue.current.push("collect");
+
           if (c.special) {
             setGems((g) => g + 1);
             shieldRef.current = true;
@@ -630,7 +1056,7 @@ export function useGameLogic() {
       collectiblesRef.current = nextCollectibles;
 
       // ======================================================
-      // 7. EXPLOSÕES
+      // 10. EXPLOSÕES E PONTOS FLUTUANTES
       // ======================================================
 
       if (newExplosions.length > 0) {
@@ -641,17 +1067,37 @@ export function useGameLogic() {
 
         explosionsRef.current = updated;
         setExplosions(updated);
+        fxQueue.current.push("explosion");
+      }
+
+      const nextPopups = [...popupsRef.current, ...newPopups]
+        .map((p) => ({ ...p, age: p.age + 1 }))
+        .filter((p) => p.age <= 24)
+        .slice(-8);
+
+      popupsRef.current = nextPopups;
+
+      // ======================================================
+      // 11. EFEITOS (sons / tremor / flash)
+      // ======================================================
+
+      if (fxQueue.current.length > 0) {
+        const names = Array.from(new Set(fxQueue.current));
+        fxQueue.current = [];
+        setFx(names.map((name) => ({ id: fxSeq.current++, name })));
       }
 
       // ======================================================
-      // 8. SINCRONIZA COM O REACT
+      // 12. SINCRONIZA COM O REACT
       // ======================================================
 
       setScore(scoreRef.current);
       setBullets(nextBullets);
-      setEnemyBullets(nextEnemy);
+      setEnemyBullets(nextEnemyBullets);
       setPowerUps(nextPowerUps);
+      setEnemies(survivors);
       setBoss(boss);
+      setPopups(nextPopups);
       setObstacles(nextObstacles);
       setCollectibles(nextCollectibles);
     }, GAME_CONFIG.GAME_LOOP_INTERVAL);
@@ -660,37 +1106,44 @@ export function useGameLogic() {
   }, []);
 
   // ==========================================================
-  // SHOOT (um toque = um disparo, conforme o nível de tiro)
+  // SHOOT
+  //
+  // Devolve true se realmente atirou (respeita o intervalo da
+  // arma). Assim o tiro automático pode chamar à vontade.
   // ==========================================================
 
-  function shoot() {
-    if (gameOverRef.current) return;
+  function shoot(): boolean {
+    if (gameOverRef.current) return false;
 
-    // Evita "metralhadora" de toques
-    if (
-      tickRef.current - lastShotTick.current <
-      GAME_CONFIG.SHOT_COOLDOWN_TICKS
-    ) {
-      return;
+    const weapon = weaponRef.current;
+
+    if (tickRef.current - lastShotTick.current < weapon.cooldown) {
+      return false;
     }
     lastShotTick.current = tickRef.current;
 
     const level = Math.min(
       weaponLevelRef.current,
-      SHOT_PATTERNS.length
+      weapon.patterns.length
     );
-    const pattern = SHOT_PATTERNS[level - 1];
+    const pattern = weapon.patterns[level - 1];
 
     // Sai do bico da nave
-    const cx = playerRef.current.x + HALF - 1.5;
-    const y = playerRef.current.y + 6;
+    const cx = playerRef.current.x + HALF;
+    const y = playerRef.current.y + 8;
 
-    const created: Bullet[] = pattern.map(([ox, vx]) => ({
+    const created: Bullet[] = pattern.map(([ox, vx, h]) => ({
       id: bulletId.current++,
       x: cx + ox,
       y,
       vx,
-      vy: -20,
+      vy: -weapon.speed,
+      damage: weapon.damage,
+      pierce: weapon.pierce,
+      homing: weapon.homing || h === 1,
+      color: weapon.color,
+      w: weapon.w,
+      h: weapon.h,
     }));
 
     const all = [...bulletsRef.current, ...created].slice(
@@ -699,6 +1152,35 @@ export function useGameLogic() {
 
     bulletsRef.current = all;
     setBullets(all);
+
+    return true;
+  }
+
+  // ==========================================================
+  // BOMBA
+  // ==========================================================
+
+  function fireBomb() {
+    if (gameOverRef.current) return;
+    if (bombsRef.current <= 0) return;
+    if (bombPending.current) return;
+    if (
+      tickRef.current - lastBombTick.current <
+      GAME_CONFIG.BOMB_COOLDOWN_TICKS
+    ) {
+      return;
+    }
+
+    lastBombTick.current = tickRef.current;
+    bombsRef.current -= 1;
+    setBombs(bombsRef.current);
+
+    // A bomba é aplicada no próximo passo do loop
+    bombPending.current = true;
+  }
+
+  function isInvulnerable(): boolean {
+    return tickRef.current < invulnUntil.current;
   }
 
   // ==========================================================
@@ -723,16 +1205,31 @@ export function useGameLogic() {
 
     weaponLevelRef.current = 1;
     lastShotTick.current = -10;
-    invulnUntil.current = 0;
-    lastPowerTick.current = 0;
 
+    bombsRef.current = GAME_CONFIG.START_BOMBS;
+    bombPending.current = false;
+    lastBombTick.current = -100;
+
+    invulnUntil.current = 0;
+    lastKillTick.current = 0;
+    lastPowerTick.current = 0;
+    lastBombItemTick.current = 0;
+
+    stageRef.current = 1;
+    stageTickRef.current = -GAME_CONFIG.STAGE_INTRO_TICKS;
+    scriptRef.current = buildStageScript(1, WIDTH);
+    scriptIdx.current = 0;
+    stagePhase.current = "play";
+    clearTimer.current = 0;
+    bossPending.current = null;
     bossRef.current = null;
-    bossCountRef.current = 0;
-    nextBossScore.current = GAME_CONFIG.BOSS_FIRST_SCORE;
+    fxQueue.current = [];
 
     bulletsRef.current = [];
     enemyBulletsRef.current = [];
+    enemiesRef.current = [];
     powerUpsRef.current = [];
+    popupsRef.current = [];
     explosionsRef.current = [];
     obstaclesRef.current = initialObstacles;
     collectiblesRef.current = initialCollectibles;
@@ -747,11 +1244,15 @@ export function useGameLogic() {
     setShield(false);
     setGameOver(false);
     setWeaponLevel(1);
-    setBanner(null);
+    setBombs(GAME_CONFIG.START_BOMBS);
+    setStage(1);
+    setFx([]);
 
     setBullets([]);
     setEnemyBullets([]);
+    setEnemies([]);
     setPowerUps([]);
+    setPopups([]);
     setBoss(null);
     setExplosions([]);
     setTrail([]);
@@ -759,6 +1260,8 @@ export function useGameLogic() {
     setCollectibles(initialCollectibles);
 
     setPlayer({ x: startX, y: startY, angle: 0 });
+
+    showBanner("FASE 1", 2000);
   }
 
   // ==========================================================
@@ -812,11 +1315,16 @@ export function useGameLogic() {
     shield,
 
     weaponLevel,
+    bombs,
+    stage,
     banner,
+    fx,
 
     bullets,
     enemyBullets,
+    enemies,
     powerUps,
+    popups,
     boss,
     explosions,
     trail,
@@ -826,6 +1334,8 @@ export function useGameLogic() {
     player,
 
     shoot,
+    fireBomb,
+    isInvulnerable,
     restartGame,
     movePlayer,
     updatePlayerPosition,

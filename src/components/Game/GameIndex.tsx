@@ -3,6 +3,7 @@ import {
   View,
   PanResponder,
   Animated,
+  TouchableOpacity,
 } from "react-native";
 
 import { useRouter } from "expo-router";
@@ -62,11 +63,16 @@ export default function Game() {
     shield,
 
     weaponLevel,
+    bombs,
+    stage,
     banner,
+    fx,
 
     bullets,
     enemyBullets,
+    enemies,
     powerUps,
+    popups,
     boss,
     explosions,
     trail,
@@ -75,9 +81,11 @@ export default function Game() {
     player,
 
     shoot,
+    fireBomb,
+    isInvulnerable,
     restartGame,
     movePlayer,
-  } = useGameLogic();
+  } = useGameLogic(selectedShip?.id);
 
   // ============================================================
   // SONS
@@ -87,6 +95,7 @@ export default function Game() {
     playShoot,
     playExplosion,
     playCollect,
+    playSfx,
     stopBackground,
     resumeBackground,
   } = useSounds();
@@ -149,50 +158,66 @@ export default function Game() {
 
 
   // ============================================================
-  // EXPLOSÕES
+  // EFEITOS DO JOGO (sons, tremor de tela, flash)
+  //
+  // A lógica avisa o que aconteceu em `fx`; aqui a gente reage.
   // ============================================================
 
-  const prevExplosionsLen =
-    useRef(0);
+  const shake = useRef(new Animated.Value(0)).current;
+  const flash = useRef(new Animated.Value(0)).current;
+  const shipOpacity = useRef(new Animated.Value(1)).current;
+
+  const runShake = (amp: number) => {
+    shake.stopAnimation();
+    Animated.sequence([
+      Animated.timing(shake, { toValue: amp, duration: 40, useNativeDriver: true }),
+      Animated.timing(shake, { toValue: -amp, duration: 60, useNativeDriver: true }),
+      Animated.timing(shake, { toValue: amp * 0.6, duration: 60, useNativeDriver: true }),
+      Animated.timing(shake, { toValue: -amp * 0.4, duration: 60, useNativeDriver: true }),
+      Animated.timing(shake, { toValue: 0, duration: 60, useNativeDriver: true }),
+    ]).start();
+  };
+
+  const runFlash = (peak: number, ms: number) => {
+    flash.stopAnimation();
+    flash.setValue(peak);
+    Animated.timing(flash, {
+      toValue: 0,
+      duration: ms,
+      useNativeDriver: true,
+    }).start();
+  };
 
   useEffect(() => {
-    if (
-      !gameOver &&
-      explosions.length >
-        prevExplosionsLen.current
-    ) {
-      playExplosion();
+    if (gameOver) return;
+
+    for (const ev of fx) {
+      switch (ev.name) {
+        case "explosion":
+          playExplosion();
+          break;
+        case "collect":
+          playCollect();
+          break;
+        case "bomb":
+          playSfx("bomb");
+          runFlash(0.85, 500);
+          runShake(10);
+          break;
+        case "bossdead":
+          playSfx("bossdead");
+          runFlash(0.6, 600);
+          runShake(14);
+          break;
+        case "hurt":
+          playSfx("hurt");
+          runShake(6);
+          break;
+        default:
+          playSfx(ev.name);
+      }
     }
-
-    prevExplosionsLen.current =
-      explosions.length;
-  }, [
-    explosions,
-    gameOver,
-  ]);
-
-  // ============================================================
-  // COLETÁVEIS
-  // ============================================================
-
-  const prevCollectiblesLen =
-    useRef(0);
-
-  useEffect(() => {
-    if (
-      !gameOver &&
-      collectibles.length <
-        prevCollectiblesLen.current
-    ) {
-      playCollect();
-    }
-
-    prevCollectiblesLen.current =
-      collectibles.length;
-  }, [
-    collectibles,
-    gameOver,
-  ]);
+  }, [fx]);
 
   // ============================================================
   // GAME OVER
@@ -233,17 +258,20 @@ export default function Game() {
   // Não existe disparo contínuo.
   // ============================================================
 
+  const shotToggle = useRef(0);
+
   const handleShoot = () => {
     // Game Over bloqueia o tiro
     if (gameOverRef.current) {
       return;
     }
 
-    // Som
-    playShoot();
-
-    // Um toque = um disparo
-    shoot();
+    // shoot() respeita o intervalo da arma e diz se atirou de verdade
+    if (shoot()) {
+      // som a cada 2 tiros (no tiro automático seria barulho demais)
+      shotToggle.current = (shotToggle.current + 1) % 2;
+      if (shotToggle.current === 0) playShoot();
+    }
   };
 
   // ============================================================
@@ -267,13 +295,6 @@ export default function Game() {
       // Retoma música
       resumeBackground();
 
-      // Reseta contadores de efeitos
-      prevExplosionsLen.current =
-        0;
-
-      prevCollectiblesLen.current =
-        0;
-
       prevGameOver.current =
         false;
     };
@@ -288,6 +309,12 @@ export default function Game() {
 
   const handleShootRef = useRef(handleShoot);
   handleShootRef.current = handleShoot;
+
+  const fireBombRef = useRef(fireBomb);
+  fireBombRef.current = fireBomb;
+
+  const isInvulnerableRef = useRef(isInvulnerable);
+  isInvulnerableRef.current = isInvulnerable;
 
   // ============================================================
   // MOVIMENTO DA NAVE
@@ -318,6 +345,7 @@ export default function Game() {
     ty: startY,
     angle: 0,
     dragging: false,
+    firing: false,
   }).current;
 
   // Tamanho REAL da área do jogo (medido no layout do container)
@@ -342,6 +370,7 @@ export default function Game() {
     motion.ty = startY;
     motion.angle = 0;
     motion.dragging = false;
+    motion.firing = false;
     shipPos.setValue({ x: startX, y: startY });
     shipAngle.setValue(0);
     movePlayer(startX, startY);
@@ -367,6 +396,7 @@ export default function Game() {
   useEffect(() => {
     let raf = 0;
     let last = Date.now();
+    let lastOpacity = 1;
 
     const {
       SHIP_STIFFNESS,
@@ -419,6 +449,20 @@ export default function Game() {
         movePlayer(m.x, m.y); // engine (colisões, tiros)
         shipPos.setValue({ x: m.x, y: m.y }); // tela
         shipAngle.setValue(m.angle);
+
+        // Tiro automático enquanto o dedo está na tela
+        if (motion.firing) handleShootRef.current();
+      }
+
+      // Pisca enquanto está invulnerável (depois de dano ou bomba)
+      const blink =
+        !gameOverRef.current &&
+        isInvulnerableRef.current() &&
+        Math.floor(now / 90) % 2 === 0;
+      const op = blink ? 0.3 : 1;
+      if (op !== lastOpacity) {
+        lastOpacity = op;
+        shipOpacity.setValue(op);
       }
 
       raf = requestAnimationFrame(frame);
@@ -436,8 +480,19 @@ export default function Game() {
       onMoveShouldSetPanResponder: () =>
         !gameOverRef.current,
 
+      // Um SEGUNDO dedo na tela = bomba
+      onPanResponderStart: (_, gesture) => {
+        if (gesture.numberActiveTouches >= 2) {
+          fireBombRef.current();
+        }
+      },
+
       onPanResponderGrant: () => {
         motion.dragging = false;
+
+        // Dedo na tela = atira (e continua atirando até soltar)
+        motion.firing = true;
+        handleShootRef.current();
       },
 
       onPanResponderMove: (_, gesture) => {
@@ -461,17 +516,13 @@ export default function Game() {
       },
 
       onPanResponderRelease: () => {
-        if (gameOverRef.current) return;
-
-        // Toque rápido (sem arrastar) = 1 disparo
-        if (!motion.dragging) {
-          handleShootRef.current();
-        }
         motion.dragging = false;
+        motion.firing = false;
       },
 
       onPanResponderTerminate: () => {
         motion.dragging = false;
+        motion.firing = false;
       },
     })
   ).current;
@@ -496,6 +547,7 @@ export default function Game() {
       coins,
       gems,
       shipId: selectedShip?.id,
+      stage,
     });
   }, [gameOver]);
 
@@ -504,8 +556,8 @@ export default function Game() {
   // ============================================================
 
   return (
-    <View
-      style={styles.container}
+    <Animated.View
+      style={[styles.container, { transform: [{ translateX: shake }] }]}
       onLayout={(e) => {
         screenSize.current = {
           w: e.nativeEvent.layout.width,
@@ -544,6 +596,9 @@ export default function Game() {
           enemyBullets={enemyBullets}
           powerUps={powerUps}
           boss={boss}
+          enemies={enemies}
+          popups={popups}
+          stage={stage}
           explosions={
             explosions
           }
@@ -570,6 +625,7 @@ export default function Game() {
             width: 90,
             height: 90,
             zIndex: 10,
+            opacity: shipOpacity,
             transform: shipPos.getTranslateTransform(),
           }}
         >
@@ -657,6 +713,110 @@ export default function Game() {
         </View>
 
         {/* ====================================================
+            FASE
+        ==================================================== */}
+
+        <View
+          pointerEvents="none"
+          style={{
+            position: "absolute",
+            top: 98,
+            right: 14,
+            zIndex: 15,
+            paddingHorizontal: 10,
+            paddingVertical: 5,
+            borderRadius: 12,
+            backgroundColor: "rgba(0,0,20,0.55)",
+            borderWidth: 1,
+            borderColor: "rgba(0,217,255,0.45)",
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 11,
+              color: "#00D9FF",
+              fontWeight: "800",
+              letterSpacing: 2,
+            }}
+          >
+            FASE {stage}
+          </Text>
+        </View>
+
+        {/* ====================================================
+            BOMBA (toque aqui, ou use um 2º dedo em qualquer lugar)
+        ==================================================== */}
+
+        <TouchableOpacity
+          onPress={() => fireBomb()}
+          disabled={gameOver || bombs <= 0}
+          activeOpacity={0.7}
+          style={{
+            position: "absolute",
+            left: 16,
+            bottom: 26,
+            zIndex: 25,
+            width: 62,
+            height: 62,
+            borderRadius: 31,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor:
+              bombs > 0
+                ? "rgba(30,136,229,0.35)"
+                : "rgba(255,255,255,0.08)",
+            borderWidth: 2,
+            borderColor:
+              bombs > 0 ? "#64b5f6" : "rgba(255,255,255,0.2)",
+          }}
+        >
+          <Text style={{ fontSize: 26, opacity: bombs > 0 ? 1 : 0.4 }}>
+            💣
+          </Text>
+
+          <View
+            style={{
+              position: "absolute",
+              top: -4,
+              right: -4,
+              minWidth: 22,
+              height: 22,
+              borderRadius: 11,
+              paddingHorizontal: 5,
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: bombs > 0 ? "#e01111" : "#555",
+              borderWidth: 1,
+              borderColor: "#fff",
+            }}
+          >
+            <Text
+              style={{ color: "#fff", fontSize: 12, fontWeight: "900" }}
+            >
+              {bombs}
+            </Text>
+          </View>
+        </TouchableOpacity>
+
+        {/* ====================================================
+            FLASH (bomba / chefão derrotado)
+        ==================================================== */}
+
+        <Animated.View
+          pointerEvents="none"
+          style={{
+            position: "absolute",
+            left: 0,
+            top: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 40,
+            backgroundColor: "#ffffff",
+            opacity: flash,
+          }}
+        />
+
+        {/* ====================================================
             AVISOS (POWER UP / CHEFÃO)
         ==================================================== */}
 
@@ -720,6 +880,6 @@ export default function Game() {
           }
         />
 
-      </View>
+      </Animated.View>
   );
 }
