@@ -1,5 +1,11 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, Animated, Easing } from 'react-native';
+import {
+  View,
+  Text,
+  Image,
+  Animated,
+  ImageSourcePropType,
+} from 'react-native';
 
 interface PlayerProps {
   x: number;
@@ -7,15 +13,25 @@ interface PlayerProps {
   angle: number;
   shield?: boolean;
   pulsating?: Animated.Value;
+  image?: ImageSourcePropType;
 }
 
-export default function Player({ x, y, angle, shield = false, pulsating }: PlayerProps) {
-  // Motor de propulsão — brilho pulsante atrás da nave
+export default function Player({
+  x,
+  y,
+  angle,
+  shield = false,
+  pulsating,
+  image,
+}: PlayerProps) {
+  // Motor de propulsão — brilho pulsante atrás da nave (só no emoji)
   const engineGlow = useRef(new Animated.Value(0.6)).current;
   const engineScale = useRef(new Animated.Value(0.8)).current;
 
   useEffect(() => {
-    Animated.loop(
+    if (image) return; // a imagem já tem o próprio fogo
+
+    const loop = Animated.loop(
       Animated.sequence([
         Animated.parallel([
           Animated.timing(engineGlow, { toValue: 1, duration: 150, useNativeDriver: true }),
@@ -26,8 +42,11 @@ export default function Player({ x, y, angle, shield = false, pulsating }: Playe
           Animated.timing(engineScale, { toValue: 0.7, duration: 150, useNativeDriver: true }),
         ]),
       ])
-    ).start();
-  }, []);
+    );
+    loop.start();
+
+    return () => loop.stop();
+  }, [image]);
 
   return (
     <View style={{
@@ -38,43 +57,56 @@ export default function Player({ x, y, angle, shield = false, pulsating }: Playe
       height: 60,
       justifyContent: 'center',
       alignItems: 'center',
-      transform: [{ rotate: `${angle - 45}deg` }],
+      // O emoji 🚀 aponta na diagonal (por isso o -45); a imagem já aponta para cima
+      transform: [{ rotate: image ? `${angle}deg` : `${angle - 45}deg` }],
       overflow: 'visible',
     }}>
-      {/* Motor — brilho atrás */}
-      <Animated.View style={{
-        position: 'absolute',
-        bottom: -8,
-        left: '50%',
-        marginLeft: -11,
-        width: 22,
-        height: 22,
-        borderRadius: 11,
-        backgroundColor: '#ff8800',
-        shadowColor: '#ffaa00',
-        shadowRadius: 12,
-        shadowOpacity: 1,
-        opacity: engineGlow,
-        transform: [{ scale: engineScale }],
-      }} />
-      <Animated.View style={{
-        position: 'absolute',
-        bottom: -4,
-        left: '50%',
-        marginLeft: -7,
-        width: 14,
-        height: 14,
-        borderRadius: 7,
-        backgroundColor: '#ffffff',
-        shadowColor: '#ffffff',
-        shadowRadius: 6,
-        shadowOpacity: 1,
-        opacity: engineGlow,
-        transform: [{ scale: engineScale }],
-      }} />
+      {/* Motor — brilho atrás (só para o emoji) */}
+      {!image && (
+        <>
+          <Animated.View style={{
+            position: 'absolute',
+            bottom: -8,
+            left: '50%',
+            marginLeft: -11,
+            width: 22,
+            height: 22,
+            borderRadius: 11,
+            backgroundColor: '#ff8800',
+            shadowColor: '#ffaa00',
+            shadowRadius: 12,
+            shadowOpacity: 1,
+            opacity: engineGlow,
+            transform: [{ scale: engineScale }],
+          }} />
+          <Animated.View style={{
+            position: 'absolute',
+            bottom: -4,
+            left: '50%',
+            marginLeft: -7,
+            width: 14,
+            height: 14,
+            borderRadius: 7,
+            backgroundColor: '#ffffff',
+            shadowColor: '#ffffff',
+            shadowRadius: 6,
+            shadowOpacity: 1,
+            opacity: engineGlow,
+            transform: [{ scale: engineScale }],
+          }} />
+        </>
+      )}
 
       {/* Nave */}
-      <Text style={{ fontSize: 44, lineHeight: 52, textAlign: 'center' }}>🚀</Text>
+      {image ? (
+        <Image
+          source={image}
+          style={{ width: 46, height: 84 }}
+          resizeMode="contain"
+        />
+      ) : (
+        <Text style={{ fontSize: 44, lineHeight: 52, textAlign: 'center' }}>🚀</Text>
+      )}
 
       {/* Escudo */}
       {shield && (

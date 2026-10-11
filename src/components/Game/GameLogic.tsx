@@ -1,4 +1,5 @@
 import { useRef, useState, useEffect } from "react";
+
 import {
   WIDTH,
   HEIGHT,
@@ -12,6 +13,14 @@ import {
   Trail,
   Obstacle,
   Collectible,
+  EnemyBullet,
+  PowerUp,
+  Boss,
+  Banner,
+  Enemy,
+  Popup,
+  FxEvent,
+  FxName,
 } from "../../types/game";
 
 import {
@@ -24,43 +33,40 @@ import {
   createInitialCollectibles,
 } from "../../utils/collectibles";
 
+import {
+  WeaponProfile,
+  getWeaponForShip,
+} from "../../game/weapons";
+
+import { createEnemy, updateEnemy } from "../../game/enemies";
+
+import { ScriptStep, buildStageScript } from "../../game/stages";
+
 /**
  * ============================================================
  * MULTIPLICADOR DE DIFICULDADE
  * ============================================================
- *
- * A dificuldade aumenta progressivamente conforme o score.
- *
- * 0       -> 1.0x
- * 500     -> 1.1x
- * 1000    -> 1.2x
- * 1500    -> 1.3x
- * 2000    -> 1.4x
- * 2500    -> 1.5x
- * 3000    -> 1.6x
- * 3500+   -> 1.7x
- *
- * Antes:
- * 1x -> 2x -> 3x -> 4x ... -> 30x
- *
- * Isso poderia tornar o jogo impossível em scores altos.
  */
-
 function getSpeedMultiplier(score: number): number {
-  const min = 1.0;
-  const max = 1.7;
-
-  const increase = Math.floor(score / 500) * 0.1;
-
-  return Math.min(min + increase, max);
+  return Math.min(1.0 + Math.floor(score / 500) * 0.1, 1.7);
 }
 
-export function useGameLogic() {
-  /**
-   * ============================================================
-   * ESTADOS DO REACT
-   * ============================================================
-   */
+const BOSS_EMOJIS = ["🛸", "👾", "🐙", "👹", "💀"];
+const MID_BOSS_EMOJIS = ["🛰️", "🤖", "🦂", "👺", "🧟"];
+
+const HALF = GAME_CONFIG.PLAYER_BOX / 2;
+const HIT_W = GAME_CONFIG.PLAYER_HIT_W;
+const HIT_H = GAME_CONFIG.PLAYER_HIT_H;
+
+/**
+ * ============================================================
+ * GAME LOGIC
+ * ============================================================
+ */
+export function useGameLogic(shipId?: string) {
+  // ==========================================================
+  // ESTADOS PRINCIPAIS
+  // ==========================================================
 
   const [score, setScore] = useState(0);
   const [coins, setCoins] = useState(0);
@@ -68,92 +74,113 @@ export function useGameLogic() {
   const [combo, setCombo] = useState(0);
   const [lives, setLives] = useState(3);
   const [gameOver, setGameOver] = useState(false);
+  const [shield, setShield] = useState(false);
+  const [weaponLevel, setWeaponLevel] = useState(1);
+  const [bombs, setBombs] = useState(GAME_CONFIG.START_BOMBS);
+  const [stage, setStage] = useState(1);
+  const [banner, setBanner] = useState<Banner | null>(null);
+  const [fx, setFx] = useState<FxEvent[]>([]);
+
+  // ==========================================================
+  // ENTIDADES DO JOGO
+  // ==========================================================
 
   const [bullets, setBullets] = useState<Bullet[]>([]);
+  const [enemyBullets, setEnemyBullets] = useState<EnemyBullet[]>([]);
+  const [powerUps, setPowerUps] = useState<PowerUp[]>([]);
+  const [enemies, setEnemies] = useState<Enemy[]>([]);
+  const [boss, setBoss] = useState<Boss | null>(null);
+  const [popups, setPopups] = useState<Popup[]>([]);
   const [explosions, setExplosions] = useState<Explosion[]>([]);
   const [trail, setTrail] = useState<Trail[]>([]);
   const [obstacles, setObstacles] = useState<Obstacle[]>([]);
-  const [collectibles, setCollectibles] =
-    useState<Collectible[]>([]);
+  const [collectibles, setCollectibles] = useState<Collectible[]>([]);
 
-  const [shield, setShield] = useState(false);
+  // ==========================================================
+  // PLAYER
+  // ==========================================================
 
-  const [player, setPlayer] =
-    useState<PlayerPosition>({
-      x: WIDTH * 0.5,
-      y: HEIGHT * 0.8,
-      angle: 0,
-    });
+  const [player, setPlayer] = useState<PlayerPosition>({
+    x: WIDTH * 0.5 - HALF,
+    y: HEIGHT * 0.8,
+    angle: 0,
+  });
 
-  /**
-   * ============================================================
-   * IDS
-   * ============================================================
-   */
+  // ==========================================================
+  // IDS
+  // ==========================================================
 
   const bulletId = useRef(0);
+  const enemyBulletId = useRef(0);
+  const enemyId = useRef(0);
+  const powerUpId = useRef(0);
+  const popupId = useRef(0);
+  const bossId = useRef(0);
+  const bannerId = useRef(0);
+  const fxSeq = useRef(0);
   const explosionId = useRef(0);
   const obstacleId = useRef(100);
   const collectibleId = useRef(1000);
   const trailId = useRef(0);
 
-  /**
-   * ============================================================
-   * REFS DO PLAYER / GAME
-   * ============================================================
-   *
-   * Esses refs são utilizados pelo Game Loop.
-   *
-   * O objetivo é evitar que o loop precise depender dos estados
-   * do React e seja recriado toda vez que shield/gameOver mudar.
-   */
+  // ==========================================================
+  // REFS DA GAME ENGINE
+  // ==========================================================
 
+  // x,y = canto superior esquerdo da caixa da nave (PLAYER_BOX)
   const playerRef = useRef({
-    x: WIDTH * 0.5,
+    x: WIDTH * 0.5 - HALF,
     y: HEIGHT * 0.8,
   });
 
   const tickRef = useRef(0);
-
   const scoreRef = useRef(0);
-
-  /**
-   * ============================================================
-   * REFS DO ENGINE
-   * ============================================================
-   *
-   * O Game Loop trabalha principalmente com esses refs.
-   *
-   * Depois do cálculo, sincronizamos com o React.
-   */
-
-  const bulletsRef = useRef<Bullet[]>([]);
-  const explosionsRef = useRef<Explosion[]>([]);
-  const obstaclesRef = useRef<Obstacle[]>([]);
-  const collectiblesRef =
-    useRef<Collectible[]>([]);
-
   const comboRef = useRef(0);
   const livesRef = useRef(3);
+
   const shieldRef = useRef(false);
   const gameOverRef = useRef(false);
 
-  /**
-   * ============================================================
-   * SHOOTING
-   * ============================================================
-   */
+  // Arma
+  const weaponRef = useRef<WeaponProfile>(getWeaponForShip(shipId));
+  const weaponLevelRef = useRef(1);
+  const lastShotTick = useRef(-10);
 
-  const shootIntervalRef =
-    useRef<ReturnType<typeof setInterval> | null>(
-      null
-    );
+  // Bombas
+  const bombsRef = useRef(GAME_CONFIG.START_BOMBS);
+  const bombPending = useRef(false);
+  const lastBombTick = useRef(-100);
 
-  /**
-   * ============================================================
-   * SINCRONIZAÇÃO DOS REFS
-   * ============================================================
-   */
+  // Combate
+  const invulnUntil = useRef(0);
+  const lastKillTick = useRef(0);
+  const lastPowerTick = useRef(0);
+  const lastBombItemTick = useRef(0);
+
+  // Fases
+  const stageRef = useRef(1);
+  const stageTickRef = useRef(-GAME_CONFIG.STAGE_INTRO_TICKS);
+  const scriptRef = useRef<ScriptStep[]>(buildStageScript(1, WIDTH));
+  const scriptIdx = useRef(0);
+  const stagePhase = useRef<"play" | "clear">("play");
+  const clearTimer = useRef(0);
+  const bossPending = useRef<{ ticks: number; mid: boolean } | null>(null);
+  const bossRef = useRef<Boss | null>(null);
+
+  const fxQueue = useRef<FxName[]>([]);
+
+  const bulletsRef = useRef<Bullet[]>([]);
+  const enemyBulletsRef = useRef<EnemyBullet[]>([]);
+  const enemiesRef = useRef<Enemy[]>([]);
+  const powerUpsRef = useRef<PowerUp[]>([]);
+  const popupsRef = useRef<Popup[]>([]);
+  const explosionsRef = useRef<Explosion[]>([]);
+  const obstaclesRef = useRef<Obstacle[]>([]);
+  const collectiblesRef = useRef<Collectible[]>([]);
+
+  // ==========================================================
+  // SINCRONIZAÇÕES
+  // ==========================================================
 
   useEffect(() => {
     shieldRef.current = shield;
@@ -163,820 +190,1119 @@ export function useGameLogic() {
     gameOverRef.current = gameOver;
   }, [gameOver]);
 
-  /**
-   * ============================================================
-   * INICIALIZAÇÃO
-   * ============================================================
-   */
+  // A arma depende da nave escolhida
+  useEffect(() => {
+    weaponRef.current = getWeaponForShip(shipId);
+  }, [shipId]);
+
+  // ==========================================================
+  // AVISO NA TELA ("FASE 1", "WARNING!"...)
+  // ==========================================================
+
+  function showBanner(text: string, ms = 1600) {
+    const id = ++bannerId.current;
+    setBanner({ id, text });
+    setTimeout(() => {
+      if (bannerId.current === id) setBanner(null);
+    }, ms);
+  }
+
+  // ==========================================================
+  // CHEFÃO / MINI-CHEFE
+  // ==========================================================
+
+  function makeBoss(isMid: boolean, tick: number): Boss {
+    const level = stageRef.current;
+
+    const baseHp =
+      GAME_CONFIG.BOSS_BASE_HP +
+      GAME_CONFIG.BOSS_HP_PER_LEVEL * (level - 1);
+
+    const hp = Math.round(
+      isMid ? baseHp * GAME_CONFIG.MID_BOSS_HP_FACTOR : baseHp
+    );
+
+    const size = isMid ? 84 : Math.min(150, 110 + (level - 1) * 8);
+    const list = isMid ? MID_BOSS_EMOJIS : BOSS_EMOJIS;
+
+    return {
+      id: bossId.current++,
+      x: WIDTH / 2,
+      y: -size,
+      hp,
+      maxHp: hp,
+      level,
+      emoji: list[(level - 1) % list.length],
+      size,
+      spawnTick: tick,
+      wave: 0,
+      hitFlash: 0,
+      isMid,
+    };
+  }
+
+  // ==========================================================
+  // INICIALIZAÇÃO DO CENÁRIO
+  // ==========================================================
 
   useEffect(() => {
-    const initialObstacles =
-      createInitialObstacles(
-        GAME_CONFIG.OBSTACLE_COUNT
-      );
+    const initialObstacles = createInitialObstacles(
+      GAME_CONFIG.OBSTACLE_COUNT
+    );
+    const initialCollectibles = createInitialCollectibles();
 
-    const initialCollectibles =
-      createInitialCollectibles();
-
-    obstaclesRef.current =
-      initialObstacles;
-
-    collectiblesRef.current =
-      initialCollectibles;
+    obstaclesRef.current = initialObstacles;
+    collectiblesRef.current = initialCollectibles;
 
     setObstacles(initialObstacles);
     setCollectibles(initialCollectibles);
 
-    return () => {
-      if (shootIntervalRef.current) {
-        clearInterval(
-          shootIntervalRef.current
-        );
-
-        shootIntervalRef.current = null;
-      }
-    };
+    showBanner("FASE 1", 2000);
   }, []);
 
-  /**
-   * ============================================================
-   * GAME LOOP
-   * ============================================================
-   *
-   * IMPORTANTE:
-   *
-   * O loop agora possui dependências [].
-   *
-   * Portanto ele não é destruído/recriado quando:
-   *
-   * - shield muda
-   * - gameOver muda
-   * - score muda
-   * - player muda
-   *
-   * O estado interno é lido através dos refs.
-   */
+  // ==========================================================
+  // GAME LOOP
+  // ==========================================================
 
   useEffect(() => {
-    const loop = setInterval(() => {
-      /**
-       * Se o jogo acabou, não processa o frame.
-       */
+    /** Tira uma vida (com escudo e invulnerabilidade). */
+    const hurtPlayer = () => {
+      if (shieldRef.current) return;
+      if (tickRef.current < invulnUntil.current) return;
 
-      if (gameOverRef.current) {
-        return;
+      invulnUntil.current =
+        tickRef.current + GAME_CONFIG.PLAYER_INVULN_TICKS;
+
+      livesRef.current -= 1;
+      setLives(livesRef.current);
+
+      fxQueue.current.push("hurt");
+
+      // Perde a sequência de combo
+      if (comboRef.current > 0) {
+        comboRef.current = 0;
+        setCombo(0);
       }
 
+      // Perde 1 nível de tiro
+      if (weaponLevelRef.current > 1) {
+        weaponLevelRef.current -= 1;
+        setWeaponLevel(weaponLevelRef.current);
+      }
+
+      if (livesRef.current <= 0) {
+        gameOverRef.current = true;
+        setGameOver(true);
+      }
+    };
+
+    const loop = setInterval(() => {
+      if (gameOverRef.current) return;
+
       tickRef.current++;
+      const tick = tickRef.current;
+      const stage = stageRef.current;
 
-      /**
-       * ========================================================
-       * SCORE
-       * ========================================================
-       */
+      scoreRef.current += 1;
+      const speedMult = getSpeedMultiplier(scoreRef.current);
 
-      const nextScore =
-        scoreRef.current + 1;
+      // Sequência de combo expira
+      if (
+        comboRef.current > 0 &&
+        tick - lastKillTick.current > GAME_CONFIG.COMBO_WINDOW_TICKS
+      ) {
+        comboRef.current = 0;
+        setCombo(0);
+      }
 
-      scoreRef.current = nextScore;
+      const mult = Math.min(
+        4,
+        1 + Math.floor(comboRef.current / 6) * 0.5
+      );
 
-      setScore(nextScore);
+      // Centro da nave
+      const pcx = playerRef.current.x + HALF;
+      const pcy = playerRef.current.y + HALF;
 
-      /**
-       * Calcula a dificuldade usando o score atual.
-       */
+      const weapon = weaponRef.current;
 
-      const speedMult =
-        getSpeedMultiplier(nextScore);
+      const newExplosions: Explosion[] = [];
+      const newPowerUps: PowerUp[] = [];
+      const newPopups: Popup[] = [];
 
-      /**
-       * ========================================================
-       * BALAS
-       * ========================================================
-       */
+      let nextObstacles = obstaclesRef.current.slice();
+      let nextEnemies: (Enemy | null)[] = enemiesRef.current.slice();
+      const nextBullets: Bullet[] = [];
 
-      let nextBullets: Bullet[] = [];
+      let boss = bossRef.current;
+      let bossDefeated = false;
 
-      let nextObstacles =
-        obstaclesRef.current;
+      // ------------------------------------------------------
+      // Ajudantes
+      // ------------------------------------------------------
 
-      let scoreBonus = 0;
-      let comboIncrease = 0;
+      const explode = (x: number, y: number) => {
+        newExplosions.push({ id: explosionId.current++, x, y });
+      };
 
-      const newExplosions: Explosion[] =
-        [];
+      const popup = (
+        x: number,
+        y: number,
+        text: string,
+        color = "#ffd700"
+      ) => {
+        newPopups.push({
+          id: popupId.current++,
+          x,
+          y,
+          text,
+          color,
+          age: 0,
+        });
+      };
 
-      /**
-       * Processa cada bala.
-       */
+      const addScore = (base: number, x: number, y: number) => {
+        const v = Math.round(base * mult);
+        scoreRef.current += v;
+        popup(
+          x,
+          y - 10,
+          mult > 1 ? `+${v} x${mult}` : `+${v}`,
+          mult > 1 ? "#ff9f1a" : "#ffd700"
+        );
+      };
 
-      for (const bullet of bulletsRef.current) {
-        const nx =
-          bullet.x + bullet.vx;
+      const registerKill = () => {
+        comboRef.current += 1;
+        lastKillTick.current = tick;
+      };
 
-        const ny =
-          bullet.y + bullet.vy;
+      const addPowerUp = (x: number, y: number, kind: "P" | "B") => {
+        newPowerUps.push({
+          id: powerUpId.current++,
+          x,
+          y,
+          speed: 4,
+          kind,
+        });
+        if (kind === "P") lastPowerTick.current = tick;
+        else lastBombItemTick.current = tick;
+      };
 
-        /**
-         * Bala saiu da tela.
-         */
+      const dropFor = (e: Enemy) => {
+        const needP =
+          weaponLevelRef.current < GAME_CONFIG.MAX_WEAPON_LEVEL;
+        const needB = bombsRef.current < GAME_CONFIG.MAX_BOMBS;
+
+        // O grandalhão sempre solta um item
+        if (e.kind === "heavy") {
+          if (needP) addPowerUp(e.x, e.y, "P");
+          else if (needB) addPowerUp(e.x, e.y, "B");
+          return;
+        }
+
+        if (needP && Math.random() < GAME_CONFIG.POWERUP_DROP_CHANCE) {
+          addPowerUp(e.x, e.y, "P");
+        } else if (
+          needB &&
+          Math.random() < GAME_CONFIG.BOMB_DROP_CHANCE
+        ) {
+          addPowerUp(e.x, e.y, "B");
+        }
+      };
+
+      const killEnemy = (idx: number) => {
+        const e = nextEnemies[idx];
+        if (!e) return;
+        addScore(e.score, e.x, e.y);
+        registerKill();
+        explode(e.x, e.y);
+        dropFor(e);
+        nextEnemies[idx] = null;
+      };
+
+      const hitEnemy = (idx: number, dmg: number) => {
+        const e = nextEnemies[idx];
+        if (!e) return;
+        const hp = e.hp - dmg;
+        if (hp <= 0) killEnemy(idx);
+        else nextEnemies[idx] = { ...e, hp, flash: 3 };
+      };
+
+      const killObstacle = (i: number) => {
+        const o = nextObstacles[i];
+        const ocx = o.x + o.fontSize / 2;
+        const ocy = o.y + o.fontSize / 2;
+
+        addScore(50, ocx, ocy);
+        registerKill();
+        explode(ocx, ocy);
 
         if (
-          nx < -20 ||
-          nx > WIDTH + 20 ||
-          ny < -20 ||
-          ny > HEIGHT + 20
+          weaponLevelRef.current < GAME_CONFIG.MAX_WEAPON_LEVEL &&
+          Math.random() < GAME_CONFIG.POWERUP_DROP_CHANCE * 0.5
         ) {
+          addPowerUp(ocx, ocy, "P");
+        }
+
+        nextObstacles[i] = randomObstacle(obstacleId.current++);
+      };
+
+      // ======================================================
+      // 0. BOMBA
+      // ======================================================
+
+      if (bombPending.current) {
+        bombPending.current = false;
+
+        enemyBulletsRef.current = [];
+
+        for (let i = 0; i < nextObstacles.length; i++) {
+          if (nextObstacles[i].y > -10) killObstacle(i);
+        }
+
+        for (let i = 0; i < nextEnemies.length; i++) {
+          if (nextEnemies[i]) hitEnemy(i, GAME_CONFIG.BOMB_ENEMY_DAMAGE);
+        }
+
+        if (boss && boss.y > -boss.size * 0.3) {
+          const dmg = Math.max(
+            25,
+            Math.round(boss.maxHp * GAME_CONFIG.BOMB_BOSS_DAMAGE_PCT)
+          );
+          boss = { ...boss, hp: boss.hp - dmg, hitFlash: 3 };
+          if (boss.hp <= 0) bossDefeated = true;
+        }
+
+        invulnUntil.current = Math.max(
+          invulnUntil.current,
+          tick + GAME_CONFIG.BOMB_INVULN_TICKS
+        );
+
+        fxQueue.current.push("bomb");
+      }
+
+      // ======================================================
+      // 1. ROTEIRO DA FASE
+      // ======================================================
+
+      if (bossPending.current && !boss) {
+        bossPending.current.ticks -= 1;
+        if (bossPending.current.ticks <= 0) {
+          boss = makeBoss(bossPending.current.mid, tick);
+          bossPending.current = null;
+        }
+      }
+
+      if (stagePhase.current === "clear") {
+        clearTimer.current -= 1;
+
+        if (clearTimer.current <= 0) {
+          const ns = stageRef.current + 1;
+          stageRef.current = ns;
+          setStage(ns);
+
+          scriptRef.current = buildStageScript(ns, WIDTH);
+          scriptIdx.current = 0;
+          stageTickRef.current = -GAME_CONFIG.STAGE_INTRO_TICKS;
+          stagePhase.current = "play";
+
+          showBanner(`FASE ${ns}`, 2000);
+        }
+      } else {
+        // O relógio da fase para enquanto há chefão
+        const blocked = !!boss || !!bossPending.current;
+
+        if (!blocked) stageTickRef.current += 1;
+
+        const script = scriptRef.current;
+
+        while (
+          !blocked &&
+          scriptIdx.current < script.length &&
+          script[scriptIdx.current].at <= stageTickRef.current
+        ) {
+          const step = script[scriptIdx.current];
+
+          if (step.type === "spawn") {
+            const alive = nextEnemies.filter(Boolean).length;
+            if (alive >= GAME_CONFIG.MAX_ENEMIES) break;
+
+            nextEnemies.push(
+              createEnemy(
+                enemyId.current++,
+                step.kind!,
+                stage,
+                {
+                  x: step.x ?? WIDTH / 2,
+                  y: step.y,
+                  dir: step.dir,
+                  phase: step.phase,
+                },
+                WIDTH
+              )
+            );
+            scriptIdx.current++;
+          } else {
+            const mid = step.type === "midboss";
+
+            bossPending.current = {
+              ticks: GAME_CONFIG.BOSS_WARNING_TICKS,
+              mid,
+            };
+
+            showBanner(mid ? "⚠️ ATENÇÃO!" : "⚠️ WARNING!", 2000);
+            fxQueue.current.push("warning");
+
+            scriptIdx.current++;
+            break;
+          }
+        }
+      }
+
+      // ======================================================
+      // 2. TIROS DO JOGADOR
+      // ======================================================
+
+      for (const bullet of bulletsRef.current) {
+        let vx = bullet.vx;
+        let vy = bullet.vy;
+
+        // Tiro teleguiado: curva em direção ao alvo mais próximo
+        if (bullet.homing) {
+          let tx = 0;
+          let ty = 0;
+          let best = 1e9;
+          let found = false;
+
+          for (const e of nextEnemies) {
+            if (!e || e.y < -10 || e.y > bullet.y + 30) continue;
+            const d = Math.hypot(e.x - bullet.x, e.y - bullet.y);
+            if (d < best) {
+              best = d;
+              tx = e.x;
+              ty = e.y;
+              found = true;
+            }
+          }
+
+          if (boss && boss.y > 0 && boss.y < bullet.y + 30) {
+            const d = Math.hypot(boss.x - bullet.x, boss.y - bullet.y);
+            if (d < best) {
+              best = d;
+              tx = boss.x;
+              ty = boss.y;
+              found = true;
+            }
+          }
+
+          if (found) {
+            const sp = weapon.speed;
+            const dx = tx - bullet.x;
+            const dy = ty - bullet.y;
+            const d = Math.hypot(dx, dy) || 1;
+
+            vx += ((dx / d) * sp - vx) * 0.22;
+            vy += ((dy / d) * sp - vy) * 0.22;
+
+            const m = Math.hypot(vx, vy) || 1;
+            vx = (vx / m) * sp;
+            vy = (vy / m) * sp;
+          }
+        }
+
+        const nx = bullet.x + vx;
+        const ny = bullet.y + vy;
+
+        if (nx < -30 || nx > WIDTH + 30 || ny < -40 || ny > HEIGHT + 20) {
           continue;
         }
 
-        let hit = false;
+        const bw = (bullet.w ?? 7) / 2;
+        const dmg = bullet.damage ?? 1;
+        const hitList = bullet.hit ? bullet.hit.slice() : [];
+        let consumed = false;
 
-        /**
-         * Verifica colisão da bala
-         * com os obstáculos.
-         */
+        // Asteroides e planetas
+        for (let i = 0; i < nextObstacles.length && !consumed; i++) {
+          const o = nextObstacles[i];
+          const key = 100000 + o.id;
+          if (hitList.includes(key)) continue;
 
-        nextObstacles =
-          nextObstacles.map(
-            (obstacle) => {
-              if (
-                !hit &&
-                Math.abs(
-                  obstacle.x - nx
-                ) < 35 &&
-                Math.abs(
-                  obstacle.y - ny
-                ) < 35
-              ) {
-                hit = true;
+          const ocx = o.x + o.fontSize / 2;
+          const ocy = o.y + o.fontSize / 2;
 
-                /**
-                 * Pontuação por destruir obstáculo.
-                 */
+          if (
+            Math.abs(ocx - nx) < o.fontSize / 2 + bw + 4 &&
+            Math.abs(ocy - ny) < o.fontSize / 2 + 10
+          ) {
+            hitList.push(key);
+            killObstacle(i);
+            if (!bullet.pierce) consumed = true;
+          }
+        }
 
-                scoreBonus += 50;
+        // Inimigos
+        for (let i = 0; i < nextEnemies.length && !consumed; i++) {
+          const e = nextEnemies[i];
+          if (!e) continue;
 
-                comboIncrease += 1;
+          const key = 200000 + e.id;
+          if (hitList.includes(key)) continue;
 
-                /**
-                 * Cria explosão.
-                 */
+          if (
+            Math.abs(e.x - nx) < e.size * 0.45 + bw &&
+            Math.abs(e.y - ny) < e.size * 0.45 + 8
+          ) {
+            hitList.push(key);
+            hitEnemy(i, dmg);
+            if (!bullet.pierce) consumed = true;
+          }
+        }
 
-                newExplosions.push({
-                  id:
-                    explosionId.current++,
-                  x: obstacle.x,
-                  y: obstacle.y,
-                });
+        // Chefão / mini-chefe
+        if (!consumed && boss && !bossDefeated && boss.y > -boss.size * 0.2) {
+          const key = 300000 + boss.id;
 
-                /**
-                 * Reposiciona obstáculo.
-                 */
+          if (
+            !hitList.includes(key) &&
+            Math.abs(nx - boss.x) < boss.size * 0.45 + bw &&
+            Math.abs(ny - boss.y) < boss.size * 0.45
+          ) {
+            hitList.push(key);
+            boss = { ...boss, hp: boss.hp - dmg, hitFlash: 3 };
+            scoreRef.current += 2;
 
-                return randomObstacle(
-                  obstacleId.current++
-                );
-              }
+            if (Math.random() < 0.15) explode(nx, ny);
+            if (boss.hp <= 0) bossDefeated = true;
+            if (!bullet.pierce) consumed = true;
+          }
+        }
 
-              return obstacle;
-            }
-          );
-
-        /**
-         * Se não acertou nada,
-         * mantém a bala.
-         */
-
-        if (!hit) {
+        if (!consumed) {
           nextBullets.push({
             ...bullet,
             x: nx,
             y: ny,
+            vx,
+            vy,
+            hit: bullet.pierce ? hitList : undefined,
           });
         }
       }
 
-      /**
-       * Atualiza ref das balas.
-       */
+      bulletsRef.current = nextBullets;
 
-      bulletsRef.current =
-        nextBullets;
+      // ======================================================
+      // 3. CHEFÃO DERROTADO
+      // ======================================================
 
-      /**
-       * ========================================================
-       * SCORE EXTRA
-       * ========================================================
-       */
+      if (boss && bossDefeated) {
+        const wasMid = boss.isMid;
+        const bonus = (wasMid ? 500 : 1000) * stage;
 
-      if (scoreBonus > 0) {
-        scoreRef.current +=
-          scoreBonus;
+        scoreRef.current += bonus;
+        popup(boss.x, boss.y, `+${bonus}`, "#ffffff");
 
-        setScore(
-          scoreRef.current
+        comboRef.current += 5;
+        lastKillTick.current = tick;
+
+        for (let k = 0; k < 5; k++) {
+          explode(
+            boss.x + (k - 2) * boss.size * 0.22,
+            boss.y + (k % 2 ? 1 : -1) * boss.size * 0.2
+          );
+        }
+
+        addPowerUp(
+          boss.x,
+          boss.y,
+          weaponLevelRef.current < GAME_CONFIG.MAX_WEAPON_LEVEL ? "P" : "B"
         );
+
+        enemyBulletsRef.current = [];
+        fxQueue.current.push("bossdead");
+
+        if (wasMid) {
+          showBanner("MINI-CHEFE DERROTADO!", 2200);
+        } else {
+          // Fim da fase: o que sobrou explode
+          nextEnemies.forEach((e, i) => {
+            if (e && i < 4) explode(e.x, e.y);
+          });
+          nextEnemies = [];
+
+          bombsRef.current = Math.min(
+            GAME_CONFIG.MAX_BOMBS,
+            bombsRef.current + 1
+          );
+          setBombs(bombsRef.current);
+
+          stagePhase.current = "clear";
+          clearTimer.current = GAME_CONFIG.STAGE_CLEAR_TICKS;
+
+          showBanner(`FASE ${stage} COMPLETA!  +${bonus}`, 2600);
+          fxQueue.current.push("stageclear");
+        }
+
+        boss = null;
       }
 
-      /**
-       * ========================================================
-       * COMBO
-       * ========================================================
-       */
+      // Combo (HUD)
+      setCombo(comboRef.current);
 
-      if (comboIncrease > 0) {
-        comboRef.current +=
-          comboIncrease;
+      // ======================================================
+      // 4. INIMIGOS
+      // ======================================================
 
-        setCombo(
-          comboRef.current
-        );
+      const enemyNew: EnemyBullet[] = [];
+      const ctx = { W: WIDTH, H: HEIGHT, px: pcx, py: pcy, stage };
+      const survivors: Enemy[] = [];
+
+      for (const e of nextEnemies) {
+        if (!e) continue;
+
+        const r = updateEnemy(e, ctx);
+
+        for (const s of r.shots) {
+          enemyNew.push({
+            id: enemyBulletId.current++,
+            x: s.x,
+            y: s.y,
+            vx: s.vx,
+            vy: s.vy,
+          });
+        }
+
+        if (!r.enemy) continue;
+        const ne = r.enemy;
+
+        // Encostar no inimigo machuca
+        if (
+          Math.abs(ne.x - pcx) < ne.size * 0.4 + HIT_W &&
+          Math.abs(ne.y - pcy) < ne.size * 0.4 + HIT_H
+        ) {
+          hurtPlayer();
+        }
+
+        survivors.push(ne);
       }
 
-      /**
-       * ========================================================
-       * EXPLOSÕES
-       * ========================================================
-       */
+      enemiesRef.current = survivors;
 
-      if (
-        newExplosions.length > 0
-      ) {
-        const updatedExplosions =
-          [
-            ...explosionsRef.current,
-            ...newExplosions,
-          ].slice(-10);
+      // ======================================================
+      // 5. OBSTÁCULOS (asteroides e planetas)
+      // ======================================================
 
-        explosionsRef.current =
-          updatedExplosions;
+      nextObstacles = nextObstacles.map((o) => {
+        // Com chefão na tela, os que ainda não entraram esperam
+        if (boss && o.y < 0) return o;
 
-        setExplosions(
-          updatedExplosions
-        );
-      }
+        const nx = o.drift
+          ? o.x + Math.sin(tick * 0.05 + o.driftPhase) * 1.5
+          : o.x;
 
-      /**
-       * ========================================================
-       * MOVIMENTO DOS OBSTÁCULOS
-       * ========================================================
-       */
+        const ny = o.y + 3 * o.speedMult * speedMult;
 
-      nextObstacles =
-        nextObstacles.map(
-          (obstacle) => {
-            let nx = obstacle.x;
+        if (ny > HEIGHT + 60) {
+          return randomObstacle(obstacleId.current++);
+        }
 
-            /**
-             * Movimento lateral.
-             */
+        const ocx = nx + o.fontSize / 2;
+        const ocy = ny + o.fontSize / 2;
 
-            if (obstacle.drift) {
-              nx =
-                obstacle.x +
-                Math.sin(
-                  tickRef.current *
-                    0.05 +
-                    obstacle.driftPhase
-                ) *
-                  1.5;
-            }
+        if (
+          Math.abs(ocx - pcx) < o.fontSize * 0.4 + HIT_W &&
+          Math.abs(ocy - pcy) < o.fontSize * 0.4 + HIT_H
+        ) {
+          hurtPlayer();
+          return randomObstacle(obstacleId.current++);
+        }
 
-            /**
-             * Movimento vertical.
-             *
-             * speedMult é o multiplicador
-             * global da dificuldade.
-             */
+        return { ...o, x: nx, y: ny };
+      });
 
-            const ny =
-              obstacle.y +
-              3 *
-                obstacle.speedMult *
-                speedMult;
+      obstaclesRef.current = nextObstacles;
 
-            /**
-             * ==================================================
-             * SAIU DA TELA
-             * ==================================================
-             */
+      // ======================================================
+      // 6. CHEFÃO: MOVIMENTO E ATAQUES
+      // ======================================================
 
-            if (
-              ny >
-              HEIGHT + 60
+      if (boss) {
+        const targetY = 100 + boss.size / 2;
+        const entered = boss.y >= targetY;
+        const phase2 = boss.hp < boss.maxHp * 0.5;
+
+        let bx = boss.x;
+        let by = boss.y;
+        let wave = boss.wave;
+
+        if (!entered) {
+          by = Math.min(targetY, by + 3);
+        } else {
+          wave += phase2 ? 0.045 : 0.03;
+          const amp = WIDTH / 2 - boss.size / 2 - 8;
+          bx = WIDTH / 2 + Math.sin(wave) * amp;
+          by = targetY + Math.sin(wave * 0.7) * 14;
+        }
+
+        boss = {
+          ...boss,
+          x: bx,
+          y: by,
+          wave,
+          hitFlash: Math.max(0, boss.hitFlash - 1),
+        };
+
+        if (entered) {
+          const bt = tick - boss.spawnTick;
+          const every =
+            Math.max(14, (phase2 ? 24 : 36) - boss.level * 2) +
+            (boss.isMid ? 6 : 0);
+
+          if (bt % every === 0) {
+            const n = Math.floor(bt / every);
+            const sx = boss.x;
+            const sy = boss.y + boss.size * 0.4;
+            const speed = 6.5 + Math.min(boss.level, 4) * 0.5;
+            const pattern = n % 3;
+
+            if (phase2 && pattern === 1) {
+              // Mirado no jogador + 2 laterais
+              const dx = pcx - sx;
+              const dy = pcy - sy;
+              const len = Math.hypot(dx, dy) || 1;
+              const ux = (dx / len) * (speed + 1.5);
+              const uy = (dy / len) * (speed + 1.5);
+
+              [-1.5, 0, 1.5].forEach((off) => {
+                enemyNew.push({
+                  id: enemyBulletId.current++,
+                  x: sx,
+                  y: sy,
+                  vx: ux + off,
+                  vy: uy,
+                });
+              });
+            } else if (
+              phase2 &&
+              pattern === 2 &&
+              boss.level >= 2 &&
+              !boss.isMid
             ) {
-              return randomObstacle(
-                obstacleId.current++
-              );
-            }
-
-            /**
-             * ==================================================
-             * COLISÃO COM PLAYER
-             * ==================================================
-             */
-
-            if (
-              Math.abs(
-                nx -
-                  playerRef.current.x
-              ) < 30 &&
-              Math.abs(
-                ny -
-                  playerRef.current.y
-              ) < 30
-            ) {
-              /**
-               * Só perde vida se não tiver shield.
-               */
-
-              if (
-                !shieldRef.current
-              ) {
-                livesRef.current -=
-                  1;
-
-                setLives(
-                  livesRef.current
-                );
-
-                /**
-                 * Game Over.
-                 */
-
-                if (
-                  livesRef.current <=
-                  0
-                ) {
-                  gameOverRef.current =
-                    true;
-
-                  setGameOver(true);
-                }
+              // Anel de tiros
+              for (let k = 0; k < 12; k++) {
+                const ang = (k / 12) * Math.PI * 2 + n * 0.2;
+                enemyNew.push({
+                  id: enemyBulletId.current++,
+                  x: sx,
+                  y: sy,
+                  vx: Math.sin(ang) * 5.2,
+                  vy: Math.cos(ang) * 5.2,
+                });
               }
+            } else {
+              // Leque (3 tiros; 5 a partir da fase 2)
+              const spread =
+                boss.level >= 2 ? [-3, -1.5, 0, 1.5, 3] : [-2, 0, 2];
 
-              /**
-               * Remove/reposiciona obstáculo.
-               */
-
-              return randomObstacle(
-                obstacleId.current++
-              );
+              spread.forEach((vx) => {
+                enemyNew.push({
+                  id: enemyBulletId.current++,
+                  x: sx,
+                  y: sy,
+                  vx,
+                  vy: speed,
+                });
+              });
             }
-
-            /**
-             * Retorna obstáculo atualizado.
-             */
-
-            return {
-              ...obstacle,
-              x: nx,
-              y: ny,
-            };
           }
-        );
+        }
 
-      /**
-       * Atualiza ref dos obstáculos.
-       */
+        // Encostar no chefão machuca
+        if (
+          Math.abs(pcx - boss.x) < boss.size * 0.4 + HIT_W &&
+          Math.abs(pcy - boss.y) < boss.size * 0.4 + HIT_H
+        ) {
+          hurtPlayer();
+        }
+      }
 
-      obstaclesRef.current =
-        nextObstacles;
+      bossRef.current = boss;
 
-      /**
-       * ========================================================
-       * COLETÁVEIS
-       * ========================================================
-       */
+      // ======================================================
+      // 7. TIROS INIMIGOS
+      // ======================================================
 
-      const nextCollectibles =
-        collectiblesRef.current.map(
-          (collectible) => {
-            /**
-             * Movimento do coletável.
-             */
+      const nextEnemyBullets: EnemyBullet[] = [];
 
-            const ny =
-              collectible.y +
-              collectible.speed *
-                speedMult;
+      for (const e of [...enemyBulletsRef.current, ...enemyNew]) {
+        const nx = e.x + e.vx;
+        const ny = e.y + e.vy;
 
-            /**
-             * ==================================================
-             * COLISÃO COM PLAYER
-             * ==================================================
-             */
+        if (nx < -20 || nx > WIDTH + 20 || ny > HEIGHT + 20 || ny < -60) {
+          continue;
+        }
 
-            if (
-              Math.abs(
-                collectible.x -
-                  playerRef.current.x
-              ) < 35 &&
-              Math.abs(
-                ny -
-                  playerRef.current.y
-              ) < 35
-            ) {
-              /**
-               * GEM / SHIELD
-               */
+        if (
+          Math.abs(nx - pcx) < HIT_W + 6 &&
+          Math.abs(ny - pcy) < HIT_H + 6
+        ) {
+          hurtPlayer();
+          continue;
+        }
 
-              if (
-                collectible.special
-              ) {
-                setGems(
-                  (g) => g + 1
-                );
+        nextEnemyBullets.push({ ...e, x: nx, y: ny });
+      }
 
-                shieldRef.current =
-                  true;
+      enemyBulletsRef.current = nextEnemyBullets;
 
-                setShield(true);
+      // ======================================================
+      // 8. ITENS "P" (tiro) E "B" (bomba)
+      // ======================================================
 
-                setTimeout(() => {
-                  shieldRef.current =
-                    false;
+      if (!boss && !bossPending.current) {
+        if (
+          weaponLevelRef.current < GAME_CONFIG.MAX_WEAPON_LEVEL &&
+          tick - lastPowerTick.current > GAME_CONFIG.POWERUP_SPAWN_TICKS
+        ) {
+          addPowerUp(30 + Math.random() * (WIDTH - 60), -30, "P");
+        }
 
-                  setShield(false);
-                }, GAME_CONFIG.SHIELD_DURATION);
-              }
+        if (
+          bombsRef.current < 2 &&
+          tick - lastBombItemTick.current >
+            GAME_CONFIG.POWERUP_SPAWN_TICKS * 2
+        ) {
+          addPowerUp(30 + Math.random() * (WIDTH - 60), -30, "B");
+        }
+      }
 
-              /**
-               * MOEDA
-               */
+      const nextPowerUps: PowerUp[] = [];
 
-              else {
-                setCoins(
-                  (m) => m + 1
-                );
-              }
+      for (const p of [...powerUpsRef.current, ...newPowerUps]) {
+        const ny = p.y + p.speed * speedMult;
 
-              /**
-               * Reposiciona coletável.
-               */
+        if (ny > HEIGHT + 40) continue;
 
-              return randomCoin(
-                collectibleId.current++,
-                collectible.special
-              );
+        if (Math.abs(p.x - pcx) < 34 && Math.abs(ny - pcy) < 44) {
+          if (p.kind === "B") {
+            if (bombsRef.current < GAME_CONFIG.MAX_BOMBS) {
+              bombsRef.current += 1;
+              setBombs(bombsRef.current);
+              popup(p.x, ny, "💣 +1", "#9ad7ff");
+              fxQueue.current.push("bombpickup");
+            } else {
+              scoreRef.current += 300;
+              popup(p.x, ny, "+300", "#ffd700");
+              fxQueue.current.push("bombpickup");
             }
-
-            /**
-             * ==================================================
-             * COLETÁVEL SAIU DA TELA
-             * ==================================================
-             */
-
-            if (
-              ny >
-              HEIGHT + 60
-            ) {
-              return randomCoin(
-                collectibleId.current++,
-                collectible.special
-              );
-            }
-
-            /**
-             * Atualiza posição.
-             */
-
-            return {
-              ...collectible,
-              y: ny,
-            };
+          } else if (
+            weaponLevelRef.current < GAME_CONFIG.MAX_WEAPON_LEVEL
+          ) {
+            weaponLevelRef.current += 1;
+            setWeaponLevel(weaponLevelRef.current);
+            showBanner(`⚡ TIRO NÍVEL ${weaponLevelRef.current}`, 1500);
+            fxQueue.current.push("powerup");
+          } else {
+            scoreRef.current += 500;
+            showBanner("TIRO MÁXIMO! +500", 1300);
+            fxQueue.current.push("powerup");
           }
-        );
+          continue;
+        }
 
-      /**
-       * Atualiza ref.
-       */
+        nextPowerUps.push({ ...p, y: ny });
+      }
 
-      collectiblesRef.current =
-        nextCollectibles;
+      powerUpsRef.current = nextPowerUps;
 
-      /**
-       * ========================================================
-       * SINCRONIZA COM REACT
-       * ========================================================
-       *
-       * Aqui enviamos os resultados calculados
-       * pelo engine para os componentes visuais.
-       */
+      // ======================================================
+      // 9. MOEDAS E GEMAS
+      // ======================================================
 
+      const nextCollectibles = collectiblesRef.current.map((c) => {
+        const ny = c.y + c.speed * speedMult;
+
+        if (
+          Math.abs(c.x + 16 - pcx) < 40 &&
+          Math.abs(ny + 16 - pcy) < 46
+        ) {
+          fxQueue.current.push("collect");
+
+          if (c.special) {
+            setGems((g) => g + 1);
+            shieldRef.current = true;
+            setShield(true);
+
+            setTimeout(() => {
+              shieldRef.current = false;
+              setShield(false);
+            }, GAME_CONFIG.SHIELD_DURATION);
+          } else {
+            setCoins((v) => v + 1);
+          }
+
+          return randomCoin(collectibleId.current++, c.special);
+        }
+
+        if (ny > HEIGHT + 60) {
+          return randomCoin(collectibleId.current++, c.special);
+        }
+
+        return { ...c, y: ny };
+      });
+
+      collectiblesRef.current = nextCollectibles;
+
+      // ======================================================
+      // 10. EXPLOSÕES E PONTOS FLUTUANTES
+      // ======================================================
+
+      if (newExplosions.length > 0) {
+        const updated = [
+          ...explosionsRef.current,
+          ...newExplosions,
+        ].slice(-6);
+
+        explosionsRef.current = updated;
+        setExplosions(updated);
+        fxQueue.current.push("explosion");
+      }
+
+      const nextPopups = [...popupsRef.current, ...newPopups]
+        .map((p) => ({ ...p, age: p.age + 1 }))
+        .filter((p) => p.age <= 24)
+        .slice(-8);
+
+      popupsRef.current = nextPopups;
+
+      // ======================================================
+      // 11. EFEITOS (sons / tremor / flash)
+      // ======================================================
+
+      if (fxQueue.current.length > 0) {
+        const names = Array.from(new Set(fxQueue.current));
+        fxQueue.current = [];
+        setFx(names.map((name) => ({ id: fxSeq.current++, name })));
+      }
+
+      // ======================================================
+      // 12. SINCRONIZA COM O REACT
+      // ======================================================
+
+      setScore(scoreRef.current);
       setBullets(nextBullets);
-
-      setObstacles(
-        nextObstacles
-      );
-
-      setCollectibles(
-        nextCollectibles
-      );
+      setEnemyBullets(nextEnemyBullets);
+      setPowerUps(nextPowerUps);
+      setEnemies(survivors);
+      setBoss(boss);
+      setPopups(nextPopups);
+      setObstacles(nextObstacles);
+      setCollectibles(nextCollectibles);
     }, GAME_CONFIG.GAME_LOOP_INTERVAL);
 
-    /**
-     * Cleanup do loop.
-     */
-
-    return () => {
-      clearInterval(loop);
-    };
+    return () => clearInterval(loop);
   }, []);
 
-  /**
-   * ============================================================
-   * SHOOT
-   * ============================================================
-   */
+  // ==========================================================
+  // SHOOT
+  //
+  // Devolve true se realmente atirou (respeita o intervalo da
+  // arma). Assim o tiro automático pode chamar à vontade.
+  // ==========================================================
 
-  function shoot() {
-    if (gameOverRef.current) {
-      return;
+  function shoot(): boolean {
+    if (gameOverRef.current) return false;
+
+    const weapon = weaponRef.current;
+
+    if (tickRef.current - lastShotTick.current < weapon.cooldown) {
+      return false;
     }
+    lastShotTick.current = tickRef.current;
 
-    /**
-     * Usa playerRef em vez do estado player.
-     *
-     * Isso evita problema de closure stale.
-     */
+    const level = Math.min(
+      weaponLevelRef.current,
+      weapon.patterns.length
+    );
+    const pattern = weapon.patterns[level - 1];
 
-    const playerX =
-      playerRef.current.x;
+    // Sai do bico da nave
+    const cx = playerRef.current.x + HALF;
+    const y = playerRef.current.y + 8;
 
-    const playerY =
-      playerRef.current.y;
+    const created: Bullet[] = pattern.map(([ox, vx, h]) => ({
+      id: bulletId.current++,
+      x: cx + ox,
+      y,
+      vx,
+      vy: -weapon.speed,
+      damage: weapon.damage,
+      pierce: weapon.pierce,
+      homing: weapon.homing || h === 1,
+      color: weapon.color,
+      w: weapon.w,
+      h: weapon.h,
+    }));
 
-    const newBullets: Bullet[] = [
-      ...bulletsRef.current,
+    const all = [...bulletsRef.current, ...created].slice(
+      -GAME_CONFIG.MAX_BULLETS
+    );
 
-      {
-        id: bulletId.current++,
-        x: playerX + 5,
-        y: playerY,
-        vx: 0,
-        vy: -14,
-      },
+    bulletsRef.current = all;
+    setBullets(all);
 
-      {
-        id: bulletId.current++,
-        x: playerX + 25,
-        y: playerY,
-        vx: 0,
-        vy: -14,
-      },
-    ];
-
-    /**
-     * Atualiza primeiro o engine.
-     */
-
-    bulletsRef.current =
-      newBullets;
-
-    /**
-     * Depois o React.
-     */
-
-    setBullets(newBullets);
+    return true;
   }
 
-  /**
-   * ============================================================
-   * START SHOOTING
-   * ============================================================
-   */
+  // ==========================================================
+  // BOMBA
+  // ==========================================================
 
-  function startShooting() {
-    if (gameOverRef.current) {
-      return;
-    }
-
-    /**
-     * Evita múltiplos intervals.
-     */
-
-    if (shootIntervalRef.current) {
-      clearInterval(
-        shootIntervalRef.current
-      );
-
-      shootIntervalRef.current =
-        null;
-    }
-
-    /**
-     * Primeiro tiro imediato.
-     */
-
-    shoot();
-
-    /**
-     * Depois tiros automáticos.
-     */
-
-    shootIntervalRef.current =
-      setInterval(() => {
-        if (
-          !gameOverRef.current
-        ) {
-          shoot();
-        }
-      }, GAME_CONFIG.SHOOT_INTERVAL);
-  }
-
-  /**
-   * ============================================================
-   * STOP SHOOTING
-   * ============================================================
-   */
-
-  function stopShooting() {
+  function fireBomb() {
+    if (gameOverRef.current) return;
+    if (bombsRef.current <= 0) return;
+    if (bombPending.current) return;
     if (
-      shootIntervalRef.current
+      tickRef.current - lastBombTick.current <
+      GAME_CONFIG.BOMB_COOLDOWN_TICKS
     ) {
-      clearInterval(
-        shootIntervalRef.current
-      );
-
-      shootIntervalRef.current =
-        null;
+      return;
     }
+
+    lastBombTick.current = tickRef.current;
+    bombsRef.current -= 1;
+    setBombs(bombsRef.current);
+
+    // A bomba é aplicada no próximo passo do loop
+    bombPending.current = true;
   }
 
-  /**
-   * ============================================================
-   * RESTART GAME
-   * ============================================================
-   */
+  function isInvulnerable(): boolean {
+    return tickRef.current < invulnUntil.current;
+  }
+
+  // ==========================================================
+  // RESTART GAME
+  // ==========================================================
 
   function restartGame() {
-    /**
-     * Cria objetos iniciais.
-     */
+    const initialObstacles = createInitialObstacles(
+      GAME_CONFIG.OBSTACLE_COUNT
+    );
+    const initialCollectibles = createInitialCollectibles();
 
-    const initialObstacles =
-      createInitialObstacles(
-        GAME_CONFIG.OBSTACLE_COUNT
-      );
-
-    const initialCollectibles =
-      createInitialCollectibles();
-
-    /**
-     * ========================================================
-     * RESET DOS REFS
-     * ========================================================
-     */
+    const startX = WIDTH * 0.5 - HALF;
+    const startY = HEIGHT * 0.8;
 
     scoreRef.current = 0;
-
     comboRef.current = 0;
-
     livesRef.current = 3;
-
     shieldRef.current = false;
-
     gameOverRef.current = false;
-
     tickRef.current = 0;
 
+    weaponLevelRef.current = 1;
+    lastShotTick.current = -10;
+
+    bombsRef.current = GAME_CONFIG.START_BOMBS;
+    bombPending.current = false;
+    lastBombTick.current = -100;
+
+    invulnUntil.current = 0;
+    lastKillTick.current = 0;
+    lastPowerTick.current = 0;
+    lastBombItemTick.current = 0;
+
+    stageRef.current = 1;
+    stageTickRef.current = -GAME_CONFIG.STAGE_INTRO_TICKS;
+    scriptRef.current = buildStageScript(1, WIDTH);
+    scriptIdx.current = 0;
+    stagePhase.current = "play";
+    clearTimer.current = 0;
+    bossPending.current = null;
+    bossRef.current = null;
+    fxQueue.current = [];
+
     bulletsRef.current = [];
-
+    enemyBulletsRef.current = [];
+    enemiesRef.current = [];
+    powerUpsRef.current = [];
+    popupsRef.current = [];
     explosionsRef.current = [];
+    obstaclesRef.current = initialObstacles;
+    collectiblesRef.current = initialCollectibles;
 
-    obstaclesRef.current =
-      initialObstacles;
-
-    collectiblesRef.current =
-      initialCollectibles;
-
-    /**
-     * ========================================================
-     * RESET DO REACT
-     * ========================================================
-     */
+    playerRef.current = { x: startX, y: startY };
 
     setScore(0);
     setCoins(0);
     setGems(0);
     setCombo(0);
     setLives(3);
-
     setShield(false);
     setGameOver(false);
+    setWeaponLevel(1);
+    setBombs(GAME_CONFIG.START_BOMBS);
+    setStage(1);
+    setFx([]);
 
     setBullets([]);
+    setEnemyBullets([]);
+    setEnemies([]);
+    setPowerUps([]);
+    setPopups([]);
+    setBoss(null);
     setExplosions([]);
     setTrail([]);
+    setObstacles(initialObstacles);
+    setCollectibles(initialCollectibles);
 
-    setObstacles(
-      initialObstacles
-    );
+    setPlayer({ x: startX, y: startY, angle: 0 });
 
-    setCollectibles(
-      initialCollectibles
-    );
-
-    /**
-     * ========================================================
-     * RESET PLAYER
-     * ========================================================
-     */
-
-    const startX =
-      WIDTH * 0.5;
-
-    const startY =
-      HEIGHT * 0.8;
-
-    playerRef.current = {
-      x: startX,
-      y: startY,
-    };
-
-    setPlayer({
-      x: startX,
-      y: startY,
-      angle: 0,
-    });
-
-    /**
-     * ========================================================
-     * PARA DISPARO ANTERIOR
-     * ========================================================
-     */
-
-    if (
-      shootIntervalRef.current
-    ) {
-      clearInterval(
-        shootIntervalRef.current
-      );
-
-      shootIntervalRef.current =
-        null;
-    }
+    showBanner("FASE 1", 2000);
   }
 
-  /**
-   * ============================================================
-   * UPDATE PLAYER
-   * ============================================================
-   */
+  // ==========================================================
+  // MOVE PLAYER (só a engine: NÃO redesenha a tela)
+  //
+  // A nave é desenhada fora do React (Animated), então mover a
+  // nave não custa nenhuma renderização.
+  // ==========================================================
+
+  function movePlayer(x: number, y: number) {
+    if (gameOverRef.current) return;
+    playerRef.current = { x, y };
+  }
+
+  // ==========================================================
+  // UPDATE PLAYER (antigo: redesenha a tela; mantido por compatibilidade)
+  // ==========================================================
 
   function updatePlayerPosition(
     x: number,
     y: number,
     angle: number
   ) {
-    if (gameOverRef.current) {
-      return;
-    }
+    if (gameOverRef.current) return;
 
-    /**
-     * Atualiza posição interna.
-     */
+    playerRef.current = { x, y };
 
-    playerRef.current = {
-      x,
-      y,
-    };
-
-    /**
-     * Atualiza visual.
-     */
-
-    setPlayer({
-      x,
-      y,
-      angle,
-    });
-
-    /**
-     * Atualiza rastro.
-     */
+    setPlayer({ x, y, angle });
 
     setTrail((prev) => {
-      const newTrail = [
-        {
-          id: trailId.current++,
-          x,
-          y,
-        },
+      const next = [
+        { id: String(trailId.current++), x, y },
         ...prev,
       ];
-
-      return newTrail.slice(0, 6);
+      return next.slice(0, 6);
     });
   }
 
-  /**
-   * ============================================================
-   * RETORNO
-   * ============================================================
-   */
+  // ==========================================================
+  // RETORNO
+  // ==========================================================
 
   return {
     score,
@@ -984,19 +1310,34 @@ export function useGameLogic() {
     gems,
     combo,
     lives,
+
     gameOver,
     shield,
 
+    weaponLevel,
+    bombs,
+    stage,
+    banner,
+    fx,
+
     bullets,
+    enemyBullets,
+    enemies,
+    powerUps,
+    popups,
+    boss,
     explosions,
     trail,
     obstacles,
     collectibles,
+
     player,
 
-    shoot: startShooting,
-    stopShooting,
+    shoot,
+    fireBomb,
+    isInvulnerable,
     restartGame,
+    movePlayer,
     updatePlayerPosition,
 
     setGameOver,

@@ -1,9 +1,12 @@
-export type ShipId = "explorer" | "shadow" | "titan" | "phantom";
+import { ImageSourcePropType } from "react-native";
+
+export type ShipId = string;
 
 export interface Ship {
   id: ShipId;
   name: string;
   emoji: string;
+  image?: ImageSourcePropType;
   unlockScore: number;
   description: string;
 }
