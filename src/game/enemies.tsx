@@ -19,15 +19,15 @@ interface KindDef {
 
 export const ENEMY_KINDS: Record<EnemyKind, KindDef> = {
   // Voa reto balançando de lado
-  scout: { emoji: "👾", size: 34, hp: 1, score: 100, fireEvery: 0 },
+  scout: { emoji: "👾", size: 34, hp: 1, score: 100, fireEvery: 10 },
   // Entra pela lateral em curva
-  swooper: { emoji: "🛸", size: 36, hp: 2, score: 150, fireEvery: 0 },
+  swooper: { emoji: "🛸", size: 36, hp: 2, score: 150, fireEvery: 10 },
   // Para no alto e mergulha em cima do jogador
-  diver: { emoji: "👽", size: 36, hp: 2, score: 150, fireEvery: 0 },
+  diver: { emoji: "👽", size: 36, hp: 2, score: 150, fireEvery: 10 },
   // Fica parado atirando na direção do jogador
-  gunner: { emoji: "🛰️", size: 42, hp: 5, score: 250, fireEvery: 34 },
+  gunner: { emoji: "🛰️", size: 42, hp: 5, score: 250, fireEvery: 50 },
   // Grande, atira em leque
-  heavy: { emoji: "🐙", size: 58, hp: 14, score: 600, fireEvery: 42 },
+  heavy: { emoji: "🐙", size: 58, hp: 14, score: 600, fireEvery: 50 },
 };
 
 export interface SpawnOpts {

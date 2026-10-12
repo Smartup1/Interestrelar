@@ -3,7 +3,7 @@ import {
   View,
   PanResponder,
   Animated,
-  TouchableOpacity,
+  Alert,
 } from "react-native";
 
 import { useRouter } from "expo-router";
@@ -15,6 +15,7 @@ import GameRenderer, { ShieldEffect } from "./GameRenderer";
 
 import { useGameLogic } from "./GameLogic";
 import { useSounds } from "../../utils/useSounds";
+import { getBombProfile } from "../../game/bombs";
 import { createPulseAnimation } from "../../utils/animations";
 
 import {
@@ -24,7 +25,8 @@ import {
 } from "../../constants/gameConfig";
 
 import { useDailyCredits } from "../../hooks/useDailyCredits";
-import { submitScore } from "../../services/ranking";
+import { submitScore, getBestLocalScore } from "../../services/ranking";
+import { unlockShipsForScore } from "../../services/shipStorage";
 import { Text } from "react-native";
 
 import styles from "./styles";
@@ -165,6 +167,7 @@ export default function Game() {
 
   const shake = useRef(new Animated.Value(0)).current;
   const flash = useRef(new Animated.Value(0)).current;
+  const [flashColor, setFlashColor] = useState("#ffffff");
   const shipOpacity = useRef(new Animated.Value(1)).current;
 
   const runShake = (amp: number) => {
@@ -201,6 +204,7 @@ export default function Game() {
           break;
         case "bomb":
           playSfx("bomb");
+          setFlashColor(getBombProfile(selectedShip?.id).color);
           runFlash(0.85, 500);
           runShake(10);
           break;
@@ -304,7 +308,8 @@ export default function Game() {
   //
   // Arrastar em qualquer ponto da tela move a nave (a nave anda
   // junto com o dedo, sem "pular" para baixo do dedo).
-  // Um toque rápido, sem arrastar, dá 1 disparo.
+  // Um toque rápido, sem arrastar, dá 1 disparo (NÃO existe tiro
+  // automático).
   // ============================================================
 
   const handleShootRef = useRef(handleShoot);
@@ -345,7 +350,6 @@ export default function Game() {
     ty: startY,
     angle: 0,
     dragging: false,
-    firing: false,
   }).current;
 
   // Tamanho REAL da área do jogo (medido no layout do container)
@@ -370,7 +374,6 @@ export default function Game() {
     motion.ty = startY;
     motion.angle = 0;
     motion.dragging = false;
-    motion.firing = false;
     shipPos.setValue({ x: startX, y: startY });
     shipAngle.setValue(0);
     movePlayer(startX, startY);
@@ -403,7 +406,8 @@ export default function Game() {
       SHIP_MAX_SPEED_X,
       SHIP_MAX_SPEED_Y,
       SHIP_TURN_RATE,
-      SHIP_MIN_TURN_SPEED,
+      SHIP_STOP_DIST,
+      SHIP_ALIGN_MIN,
       SHIP_MAX_TURN,
     } = GAME_CONFIG;
 
@@ -415,43 +419,54 @@ export default function Game() {
       if (!gameOverRef.current && dt > 0) {
         const m = motion;
 
-        // Velocidade proporcional à distância do alvo (mola),
-        // com limite de velocidade (lado menor que cima/baixo)
-        const vx = Math.max(
-          -SHIP_MAX_SPEED_X,
-          Math.min(SHIP_MAX_SPEED_X, (m.tx - m.x) * SHIP_STIFFNESS)
-        );
-        const vy = Math.max(
-          -SHIP_MAX_SPEED_Y,
-          Math.min(SHIP_MAX_SPEED_Y, (m.ty - m.y) * SHIP_STIFFNESS)
-        );
+        const dx = m.tx - m.x;
+        const dy = m.ty - m.y;
+        const dist = Math.hypot(dx, dy);
 
-        m.x += vx * dt;
-        m.y += vy * dt;
+        // 1) GIRO: a ponta aponta DIRETO para o dedo (0° = cima,
+        //    90° = direita, 180° = baixo, -90° = esquerda).
+        //    Perto do alvo, volta suavemente para cima.
+        let align = 1; // 1 = ponta já aponta para o dedo
 
-        // A ponta aponta para onde a nave está indo (0° = cima,
-        // 90° = direita, 180° = baixo, -90° = esquerda). Parada,
-        // ela volta suavemente para cima.
-        const speed = Math.hypot(vx, vy);
-
-        if (speed > SHIP_MIN_TURN_SPEED) {
-          let target = Math.atan2(vx, -vy) * (180 / Math.PI);
+        if (dist > SHIP_STOP_DIST) {
+          let target = Math.atan2(dx, -dy) * (180 / Math.PI);
           target = Math.max(-SHIP_MAX_TURN, Math.min(SHIP_MAX_TURN, target));
 
           // caminho mais curto até o ângulo novo
           const diff = ((target - m.angle + 540) % 360) - 180;
           m.angle += diff * Math.min(1, dt * SHIP_TURN_RATE);
           m.angle = ((m.angle + 540) % 360) - 180;
+
+          // quanto ainda falta girar (depois deste frame)
+          const left = ((target - m.angle + 540) % 360) - 180;
+          align = Math.max(0, Math.cos((left * Math.PI) / 180));
         } else {
           m.angle -= m.angle * Math.min(1, dt * 6);
         }
+
+        // 2) ANDAR: a nave só ganha velocidade cheia quando a ponta
+        //    já aponta para o dedo. Enquanto vira, anda devagar -
+        //    isso acaba com o "deslizar de lado".
+        const speedFactor = SHIP_ALIGN_MIN + (1 - SHIP_ALIGN_MIN) * align;
+
+        const vx =
+          Math.max(
+            -SHIP_MAX_SPEED_X,
+            Math.min(SHIP_MAX_SPEED_X, dx * SHIP_STIFFNESS)
+          ) * speedFactor;
+        const vy =
+          Math.max(
+            -SHIP_MAX_SPEED_Y,
+            Math.min(SHIP_MAX_SPEED_Y, dy * SHIP_STIFFNESS)
+          ) * speedFactor;
+
+        m.x += vx * dt;
+        m.y += vy * dt;
 
         movePlayer(m.x, m.y); // engine (colisões, tiros)
         shipPos.setValue({ x: m.x, y: m.y }); // tela
         shipAngle.setValue(m.angle);
 
-        // Tiro automático enquanto o dedo está na tela
-        if (motion.firing) handleShootRef.current();
       }
 
       // Pisca enquanto está invulnerável (depois de dano ou bomba)
@@ -481,18 +496,15 @@ export default function Game() {
         !gameOverRef.current,
 
       // Um SEGUNDO dedo na tela = bomba
-      onPanResponderStart: (_, gesture) => {
+      onPanResponderStart: (evt, gesture) => {
         if (gesture.numberActiveTouches >= 2) {
           fireBombRef.current();
         }
       },
 
       onPanResponderGrant: () => {
+        // Sem tiro automático: encostar o dedo NÃO atira.
         motion.dragging = false;
-
-        // Dedo na tela = atira (e continua atirando até soltar)
-        motion.firing = true;
-        handleShootRef.current();
       },
 
       onPanResponderMove: (_, gesture) => {
@@ -516,13 +528,13 @@ export default function Game() {
       },
 
       onPanResponderRelease: () => {
+        // Toque rápido (sem arrastar) = 1 disparo
+        if (!motion.dragging) handleShootRef.current();
         motion.dragging = false;
-        motion.firing = false;
       },
 
       onPanResponderTerminate: () => {
         motion.dragging = false;
-        motion.firing = false;
       },
     })
   ).current;
@@ -549,7 +561,36 @@ export default function Game() {
       shipId: selectedShip?.id,
       stage,
     });
+
+    void checkShipUnlocks(score);
   }, [gameOver]);
+
+  // ============================================================
+  // DESBLOQUEIO DE NAVES
+  //
+  // Libera (e salva) as naves cuja pontuação já foi alcançada.
+  // Roda ao fim de cada partida e ao abrir o jogo (pelo recorde).
+  // ============================================================
+
+  const checkShipUnlocks = async (points: number) => {
+    try {
+      const best = await getBestLocalScore();
+      const fresh = await unlockShipsForScore(Math.max(points, best));
+
+      if (fresh.length > 0) {
+        Alert.alert(
+          "Nave desbloqueada!",
+          fresh.map((s) => `${s.emoji} ${s.name}`).join("\n")
+        );
+      }
+    } catch (e) {
+      console.warn("Erro ao desbloquear naves:", e);
+    }
+  };
+
+  useEffect(() => {
+    void checkShipUnlocks(0);
+  }, []);
 
   // ============================================================
   // RENDER
@@ -747,18 +788,27 @@ export default function Game() {
             BOMBA (toque aqui, ou use um 2º dedo em qualquer lugar)
         ==================================================== */}
 
-        <TouchableOpacity
-          onPress={() => fireBomb()}
-          disabled={gameOver || bombs <= 0}
-          activeOpacity={0.7}
+        {/*
+          Não usamos TouchableOpacity aqui: o PanResponder da tela
+          "roubava" o toque assim que o dedo mexia um pouquinho e o
+          onPress nunca disparava. Este botão pega o toque para ele
+          (não deixa o pai roubar) e dispara no instante em que o
+          dedo encosta (onTouchStart funciona até com o 2º dedo).
+        */}
+        <View
+          onStartShouldSetResponder={() => !gameOver}
+          onResponderTerminationRequest={() => false}
+          onTouchStart={() => {
+            if (!gameOver) fireBomb();
+          }}
           style={{
             position: "absolute",
             left: 16,
             bottom: 26,
             zIndex: 25,
-            width: 62,
-            height: 62,
-            borderRadius: 31,
+            width: 70,
+            height: 70,
+            borderRadius: 35,
             alignItems: "center",
             justifyContent: "center",
             backgroundColor:
@@ -770,11 +820,12 @@ export default function Game() {
               bombs > 0 ? "#64b5f6" : "rgba(255,255,255,0.2)",
           }}
         >
-          <Text style={{ fontSize: 26, opacity: bombs > 0 ? 1 : 0.4 }}>
+          <Text style={{ fontSize: 28, opacity: bombs > 0 ? 1 : 0.4 }}>
             💣
           </Text>
 
           <View
+            pointerEvents="none"
             style={{
               position: "absolute",
               top: -4,
@@ -796,7 +847,7 @@ export default function Game() {
               {bombs}
             </Text>
           </View>
-        </TouchableOpacity>
+        </View>
 
         {/* ====================================================
             FLASH (bomba / chefão derrotado)
@@ -811,7 +862,7 @@ export default function Game() {
             right: 0,
             bottom: 0,
             zIndex: 40,
-            backgroundColor: "#ffffff",
+            backgroundColor: flashColor,
             opacity: flash,
           }}
         />

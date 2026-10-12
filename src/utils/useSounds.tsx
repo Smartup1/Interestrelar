@@ -5,7 +5,7 @@ import { useAudioPlayer } from "expo-audio";
 const shootSound     = require("../../assets/shoot.wav");
 const explosionSound = require("../../assets/explosion.wav");
 const collectSound   = require("../../assets/collect.wav");
-const bgSound        = require("../../assets/background.mp3");
+const bgSound        = require("../../assets/music-space.wav");
 
 // Efeitos novos
 const powerupSound    = require("../../assets/sfx-powerup.wav");

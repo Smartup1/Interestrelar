@@ -41,8 +41,11 @@ export const GAME_CONFIG = {
   TAP_MOVE_THRESHOLD: 8,         // movimento mínimo do dedo (px) para contar como arrastar e não como toque
 
   // Rotação da ponta
-  SHIP_TURN_RATE: 9,             // maior = a ponta vira mais rápido
-  SHIP_MIN_TURN_SPEED: 140,      // abaixo dessa velocidade (px/s) a ponta volta para cima
+  SHIP_TURN_RATE: 16,            // maior = a ponta vira mais rápido (era 9)
+  SHIP_MIN_TURN_SPEED: 140,      // (não usado mais; a ponta usa SHIP_STOP_DIST)
+  SHIP_STOP_DIST: 14,            // perto do alvo (px) a ponta volta para cima
+  SHIP_ALIGN_MIN: 0.3,           // velocidade mínima (fração) enquanto a ponta ainda não aponta pro dedo
+                                 // (menor = a nave "freia" mais até apontar; 1 = anda de lado como antes)
   SHIP_MAX_TURN: 180,            // 180 = vira para todos os lados; 60 = no máximo 60° para cada lado
 
   // Nível de tiro (estilo Aero Fighters)
@@ -60,6 +63,7 @@ export const GAME_CONFIG = {
   STAGE_INTRO_TICKS: 36,         // pausa com "FASE N" antes das ondas
   STAGE_CLEAR_TICKS: 60,         // pausa depois do chefão antes da próxima fase
   BOSS_WARNING_TICKS: 36,        // "WARNING" antes do chefão entrar
+  MAX_ENEMY_BULLETS: 60,         // limite de tiros inimigos na tela (desempenho)
   MAX_ENEMIES: 14,               // inimigos na tela ao mesmo tempo (desempenho)
 
   // Chefão e mini-chefe

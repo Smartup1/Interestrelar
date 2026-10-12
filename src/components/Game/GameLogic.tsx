@@ -1,3 +1,4 @@
+import { getBombProfile, bossSpecial } from "../../game/bombs";
 import { useRef, useState, useEffect } from "react";
 
 import {
@@ -143,6 +144,7 @@ export function useGameLogic(shipId?: string) {
 
   // Arma
   const weaponRef = useRef<WeaponProfile>(getWeaponForShip(shipId));
+  const shipIdRef = useRef<string | undefined>(shipId);
   const weaponLevelRef = useRef(1);
   const lastShotTick = useRef(-10);
 
@@ -193,6 +195,7 @@ export function useGameLogic(shipId?: string) {
   // A arma depende da nave escolhida
   useEffect(() => {
     weaponRef.current = getWeaponForShip(shipId);
+    shipIdRef.current = shipId;
   }, [shipId]);
 
   // ==========================================================
@@ -421,6 +424,28 @@ export function useGameLogic(shipId?: string) {
         nextEnemies[idx] = null;
       };
 
+      // Filhotes do chefão: versões pequenas do emoji dele
+      const spawnKids = (b: Boss, count: number) => {
+        for (let k = 0; k < count; k++) {
+          const t = count === 1 ? 0 : k / (count - 1) - 0.5; // -0.5..0.5
+
+          const kid = createEnemy(
+            enemyId.current++,
+            "scout",
+            stage,
+            { x: b.x + t * b.size * 0.9, phase: k * 1.3 },
+            WIDTH
+          );
+
+          nextEnemies.push({
+            ...kid,
+            emoji: b.emoji,
+            y: b.y + (k % 2 ? 10 : -10),
+            vy: kid.vy * (0.8 + (k % 3) * 0.25),
+          });
+        }
+      };
+
       const hitEnemy = (idx: number, dmg: number) => {
         const e = nextEnemies[idx];
         if (!e) return;
@@ -455,30 +480,45 @@ export function useGameLogic(shipId?: string) {
       if (bombPending.current) {
         bombPending.current = false;
 
-        enemyBulletsRef.current = [];
+        const bp = getBombProfile(shipIdRef.current);
+        const lane = bp.laneHalfWidth;
+        const inLane = (x: number) => lane <= 0 || Math.abs(x - pcx) <= lane;
 
-        for (let i = 0; i < nextObstacles.length; i++) {
-          if (nextObstacles[i].y > -10) killObstacle(i);
+        if (bp.clearBullets) {
+          const kept = enemyBulletsRef.current.filter(
+            (b) => lane > 0 && !inLane(b.x)
+          );
+          scoreRef.current +=
+            (enemyBulletsRef.current.length - kept.length) * bp.pointsPerClear;
+          enemyBulletsRef.current = kept;
+        }
+
+        if (bp.clearObstacles) {
+          for (let i = 0; i < nextObstacles.length; i++) {
+            if (nextObstacles[i].y > -10 && inLane(nextObstacles[i].x)) {
+              scoreRef.current += bp.pointsPerClear;
+              killObstacle(i);
+            }
+          }
         }
 
         for (let i = 0; i < nextEnemies.length; i++) {
-          if (nextEnemies[i]) hitEnemy(i, GAME_CONFIG.BOMB_ENEMY_DAMAGE);
+          const en = nextEnemies[i];
+          if (en && inLane(en.x)) hitEnemy(i, bp.enemyDamage);
         }
 
-        if (boss && boss.y > -boss.size * 0.3) {
-          const dmg = Math.max(
-            25,
-            Math.round(boss.maxHp * GAME_CONFIG.BOMB_BOSS_DAMAGE_PCT)
-          );
+        if (boss && boss.y > -boss.size * 0.3 && inLane(boss.x)) {
+          const dmg = Math.max(25, Math.round(boss.maxHp * bp.bossPct));
           boss = { ...boss, hp: boss.hp - dmg, hitFlash: 3 };
           if (boss.hp <= 0) bossDefeated = true;
         }
 
         invulnUntil.current = Math.max(
           invulnUntil.current,
-          tick + GAME_CONFIG.BOMB_INVULN_TICKS
+          tick + bp.invulnTicks
         );
 
+        popup(pcx, pcy - 50, bp.name, bp.color);
         fxQueue.current.push("bomb");
       }
 
@@ -714,11 +754,7 @@ export function useGameLogic(shipId?: string) {
           );
         }
 
-        addPowerUp(
-          boss.x,
-          boss.y,
-          weaponLevelRef.current < GAME_CONFIG.MAX_WEAPON_LEVEL ? "P" : "B"
-        );
+        // (antes aqui caía o item "P"/"B"; agora o chefão solta filhotes, veja abaixo)
 
         enemyBulletsRef.current = [];
         fxQueue.current.push("bossdead");
@@ -744,6 +780,9 @@ export function useGameLogic(shipId?: string) {
           showBanner(`FASE ${stage} COMPLETA!  +${bonus}`, 2600);
           fxQueue.current.push("stageclear");
         }
+
+        // Filhotes: pequenos emojis iguais ao chefão saem dele
+        spawnKids(boss, wasMid ? 3 : Math.min(7, 4 + stage));
 
         boss = null;
       }
@@ -856,6 +895,35 @@ export function useGameLogic(shipId?: string) {
 
         if (entered) {
           const bt = tick - boss.spawnTick;
+
+          // O chefão solta filhotes durante a luta
+          const kidEvery = boss.isMid ? 130 : phase2 ? 70 : 100;
+          if (
+            bt > 0 &&
+            bt % kidEvery === 0 &&
+            nextEnemies.filter(Boolean).length < GAME_CONFIG.MAX_ENEMIES - 4
+          ) {
+            spawnKids(boss, 2);
+          }
+          // "Bomba" do chefão: ataque especial diferente para cada um
+          const specialEvery = phase2 ? 130 : 200;
+          if (!boss.isMid && bt > 0 && bt % specialEvery === 0) {
+            const sp = bossSpecial(
+              boss.level,
+              boss.x,
+              boss.y + boss.size * 0.4,
+              WIDTH,
+              pcx,
+              pcy,
+              Math.floor(bt / specialEvery)
+            );
+            popup(boss.x, boss.y + boss.size * 0.6, sp.name, "#ff5252");
+            fxQueue.current.push("warning");
+            for (const s of sp.shots) {
+              enemyNew.push({ id: enemyBulletId.current++, ...s });
+            }
+          }
+
           const every =
             Math.max(14, (phase2 ? 24 : 36) - boss.level * 2) +
             (boss.isMid ? 6 : 0);
@@ -955,7 +1023,10 @@ export function useGameLogic(shipId?: string) {
         nextEnemyBullets.push({ ...e, x: nx, y: ny });
       }
 
-      enemyBulletsRef.current = nextEnemyBullets;
+      enemyBulletsRef.current =
+        nextEnemyBullets.length > GAME_CONFIG.MAX_ENEMY_BULLETS
+          ? nextEnemyBullets.slice(-GAME_CONFIG.MAX_ENEMY_BULLETS)
+          : nextEnemyBullets;
 
       // ======================================================
       // 8. ITENS "P" (tiro) E "B" (bomba)
@@ -1150,8 +1221,9 @@ export function useGameLogic(shipId?: string) {
       -GAME_CONFIG.MAX_BULLETS
     );
 
+    // Só atualiza o ref: o loop do jogo já redesenha os tiros no próximo
+    // tick. (Antes cada tiro forçava um redesenho extra da tela inteira.)
     bulletsRef.current = all;
-    setBullets(all);
 
     return true;
   }

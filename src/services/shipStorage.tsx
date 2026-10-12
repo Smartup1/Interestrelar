@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { ShipId, ShipStorage } from "../types/ships";
+import { Ship, ShipId, ShipStorage } from "../types/ships";
+import { SHIPS } from "../constants/ships";
 
 const STORAGE_KEY = "@interestrelar/ships";
 
@@ -100,4 +101,33 @@ export async function selectShip(
   await saveShipStorage(updated);
 
   return updated;
+}
+
+
+/**
+ * Desbloqueia (e SALVA) todas as naves cujo `unlockScore` já foi
+ * alcançado. Devolve só as naves que acabaram de ser liberadas.
+ */
+export async function unlockShipsForScore(
+  score: number
+): Promise<Ship[]> {
+  const current = await loadShipStorage();
+
+  const fresh = SHIPS.filter(
+    (ship) =>
+      score >= ship.unlockScore &&
+      !current.unlockedShips.includes(ship.id)
+  );
+
+  if (fresh.length === 0) return [];
+
+  await saveShipStorage({
+    ...current,
+    unlockedShips: [
+      ...current.unlockedShips,
+      ...fresh.map((ship) => ship.id),
+    ],
+  });
+
+  return fresh;
 }
