@@ -1,0 +1,344 @@
+diff --git a/app.json b/app.json
+index b056e6c..2e56e92 100644
+--- a/app.json
++++ b/app.json
+@@ -31,6 +31,7 @@
+       "expo-splash-screen",
+       "expo-status-bar",
+       "expo-asset"
+-    ]
++    ],
++    "scheme": "interestrelar"
+   }
+ }
+diff --git a/app/index.tsx b/app/index.tsx
+index 1baf57c..a7d98d1 100644
+--- a/app/index.tsx
++++ b/app/index.tsx
+@@ -20,7 +20,7 @@ import { useDailyCredits } from '../src/hooks/useDailyCredits';
+ import { useAuth } from '../src/hooks/useAuth';
+ import { getPlayerStats, PlayerStats } from '../src/services/ranking';
+ import { hasOnboarded } from '../src/services/auth';
+-import { PRIVACY_URL } from '../src/config/server';
++import { openPrivacyPolicy } from '../src/config/server';
+ 
+ // ─────────────────────────────────────────────────────────────
+ // BADGE DE CRÉDITOS
+@@ -352,7 +352,7 @@ function OptionsModal({
+               onProfile();
+             }}
+           />
+-          <Row icon="🔒" label="Política de Privacidade" onPress={() => Linking.openURL(PRIVACY_URL)} />
++          <Row icon="🔒" label="Política de Privacidade" onPress={() => openPrivacyPolicy()} />
+ 
+           <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 11, textAlign: 'center', marginTop: 6 }}>
+             Interestrelar · versão {version}
+diff --git a/app/login.tsx b/app/login.tsx
+index 858bf1c..ee792c6 100644
+--- a/app/login.tsx
++++ b/app/login.tsx
+@@ -24,7 +24,7 @@ import HomeSky from "../src/components/Sky/HomeSky";
+ import { useAuth } from "../src/hooks/useAuth";
+ import { useGoogleSignIn } from "../src/hooks/useGoogleSignIn";
+ import { continueAsGuest, markOnboarded } from "../src/services/auth";
+-import { PRIVACY_URL } from "../src/config/server";
++import { openPrivacyPolicy } from "../src/config/server";
+ 
+ export default function LoginScreen() {
+   const router = useRouter();
+@@ -236,7 +236,7 @@ export default function LoginScreen() {
+             >
+               Ao continuar você concorda com a{" "}
+               <Text
+-                onPress={() => Linking.openURL(PRIVACY_URL)}
++                onPress={() => openPrivacyPolicy()}
+                 style={{ textDecorationLine: "underline", color: "rgba(180,210,255,0.8)" }}
+               >
+                 Política de Privacidade
+diff --git a/app/perfil.tsx b/app/perfil.tsx
+index fb8e9e4..57a4c73 100644
+--- a/app/perfil.tsx
++++ b/app/perfil.tsx
+@@ -19,7 +19,7 @@ import HomeSky from "../src/components/Sky/HomeSky";
+ import { useAuth } from "../src/hooks/useAuth";
+ import { useGoogleSignIn } from "../src/hooks/useGoogleSignIn";
+ import { deleteAllLocalData } from "../src/services/auth";
+-import { PRIVACY_URL } from "../src/config/server";
++import { openPrivacyPolicy } from "../src/config/server";
+ import { AuthProviderId } from "../src/types/ranking";
+ 
+ const PROVIDER_NAMES: Record<AuthProviderId, string> = {
+@@ -267,7 +267,7 @@ export default function PerfilScreen() {
+ 
+         <View style={{ gap: 10 }}>
+           <TouchableOpacity
+-            onPress={() => Linking.openURL(PRIVACY_URL)}
++            onPress={() => openPrivacyPolicy()}
+             style={{
+               paddingVertical: 14,
+               borderRadius: 14,
+diff --git a/src/components/Player/styles.tsx b/src/components/Player/styles.tsx
+deleted file mode 100644
+index 08778d7..0000000
+--- a/src/components/Player/styles.tsx
++++ /dev/null
+@@ -1 +0,0 @@
+-{\rtf1}
+\ No newline at end of file
+diff --git a/src/config/server.tsx b/src/config/server.tsx
+index c6fc711..a0b62a8 100644
+--- a/src/config/server.tsx
++++ b/src/config/server.tsx
+@@ -1,3 +1,5 @@
++import { Alert, Linking } from "react-native";
++
+ // src/config/server.tsx
+ //
+ // ============================================================
+@@ -45,5 +47,26 @@ export const AUTH_CONFIG = {
+   },
+ };
+ 
++// ============================================================
++// POLÍTICA DE PRIVACIDADE
++// ============================================================
++//
++// A Google Play exige o link de uma política de privacidade.
++// Cole aqui o endereço quando tiver (ex.: uma página no GitHub Pages).
++
++export const PRIVACY_URL = "";
++
++/** Abre a política de privacidade (avisa se o link ainda não foi configurado). */
++export function openPrivacyPolicy(): void {
++  if (!PRIVACY_URL.trim()) {
++    Alert.alert(
++      "Política de privacidade",
++      "O link da política ainda não foi configurado."
++    );
++    return;
++  }
++  void Linking.openURL(PRIVACY_URL);
++}
++
+ export const isServerConfigured = (): boolean =>
+   SERVER_CONFIG.API_URL.trim().length > 0;
+diff --git a/src/hooks/useTiltControl.tsx b/src/hooks/useTiltControl.tsx
+deleted file mode 100644
+index 16d0a9f..0000000
+--- a/src/hooks/useTiltControl.tsx
++++ /dev/null
+@@ -1,84 +0,0 @@
+-// src/hooks/useTiltControl.tsx
+-import { useEffect, useRef } from "react";
+-import { Platform } from "react-native";
+-import { Accelerometer } from "expo-sensors";
+-
+-export interface TiltValue {
+-  x: number; // inclinação esquerda/direita (-1 a 1, aprox.)
+-  y: number; // inclinação frente/trás (-1 a 1, aprox.)
+-}
+-
+-interface UseTiltControlOptions {
+-  enabled: boolean;
+-  updateIntervalMs?: number;
+-  // Suavização do sinal (0 = sem suavização, mais perto de 1 = mais suave/lento)
+-  smoothing?: number;
+-}
+-
+-/**
+- * Lê o acelerômetro do aparelho e devolve uma ref com a inclinação atual,
+- * já calibrada (zerada) a partir da posição em que o jogador está segurando
+- * o celular no momento em que o controle é ativado.
+- *
+- * Usar via ref (não via state) para evitar re-renders a 60fps — quem consome
+- * este hook deve ler tiltRef.current dentro do próprio loop do jogo.
+- */
+-export function useTiltControl({
+-  enabled,
+-  updateIntervalMs = 16,
+-  smoothing = 0.15,
+-}: UseTiltControlOptions) {
+-  const tiltRef = useRef<TiltValue>({ x: 0, y: 0 });
+-  const baselineRef = useRef<{ x: number; y: number } | null>(null);
+-  const smoothedRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+-
+-  useEffect(() => {
+-    if (!enabled) {
+-      baselineRef.current = null;
+-      tiltRef.current = { x: 0, y: 0 };
+-      smoothedRef.current = { x: 0, y: 0 };
+-      return;
+-    }
+-
+-    if (Platform.OS === "web") return;
+-
+-    let subscription: { remove: () => void } | null = null;
+-    let cancelled = false;
+-
+-    Accelerometer.isAvailableAsync().then((available) => {
+-      if (!available || cancelled) return;
+-
+-      Accelerometer.setUpdateInterval(updateIntervalMs);
+-
+-      subscription = Accelerometer.addListener(({ x, y }) => {
+-        // Calibra na primeira leitura: essa posição vira o "neutro",
+-        // assim o jogador não precisa segurar o celular perfeitamente na vertical.
+-        if (!baselineRef.current) {
+-          baselineRef.current = { x, y };
+-        }
+-
+-        const rawX = x - baselineRef.current.x;
+-        const rawY = y - baselineRef.current.y;
+-
+-        // Suavização (low-pass filter) para tirar tremida/ruído do sensor
+-        smoothedRef.current = {
+-          x: smoothedRef.current.x + (rawX - smoothedRef.current.x) * (1 - smoothing),
+-          y: smoothedRef.current.y + (rawY - smoothedRef.current.y) * (1 - smoothing),
+-        };
+-
+-        tiltRef.current = {
+-          x: smoothedRef.current.x,
+-          y: smoothedRef.current.y,
+-        };
+-      });
+-    });
+-
+-    return () => {
+-      cancelled = true;
+-      subscription?.remove();
+-      baselineRef.current = null;
+-    };
+-  }, [enabled, updateIntervalMs, smoothing]);
+-
+-  return tiltRef;
+-}
+diff --git a/src/hooks/useTiltSteering.tsx b/src/hooks/useTiltSteering.tsx
+deleted file mode 100644
+index 0308687..0000000
+--- a/src/hooks/useTiltSteering.tsx
++++ /dev/null
+@@ -1,111 +0,0 @@
+-// src/hooks/useTiltSteering.tsx
+-
+-import { useEffect, useRef } from "react";
+-import { Platform } from "react-native";
+-import { Accelerometer } from "expo-sensors";
+-import { GAME_CONFIG } from "../constants/gameConfig";
+-
+-/**
+- * Controle da nave exclusivamente pelo acelerômetro.
+- *
+- * Devolve uma ref (tiltX.current) com valor de -1 a 1:
+- *   negativo = inclinação para um lado
+- *   positivo = inclinação para o outro lado
+- *
+- * Calibração: a primeira leitura depois que o sensor é ligado vira a
+- * posição neutra. Como o sensor liga/desliga conforme `enabled`, o jogo
+- * é recalibrado a cada nova partida (passe `!gameOver`).
+- *
+- * O TOUCH NÃO controla a nave; serve somente para disparar.
+- */
+-export function useTiltSteering(enabled: boolean = true) {
+-  const tiltX = useRef(0);
+-
+-  // Posição neutra do celular no momento em que o sensor é iniciado
+-  const baselineX = useRef<number | null>(null);
+-
+-  // Valor suavizado
+-  const smoothedX = useRef(0);
+-
+-  useEffect(() => {
+-    baselineX.current = null;
+-    smoothedX.current = 0;
+-    tiltX.current = 0;
+-
+-    // Sensor não funciona no navegador
+-    if (Platform.OS === "web" || !enabled) return;
+-
+-    const {
+-      TILT_UPDATE_INTERVAL,
+-      TILT_SMOOTHING_ALPHA,
+-      TILT_DEADZONE,
+-      TILT_MAX_TILT,
+-      TILT_INVERT_X,
+-    } = GAME_CONFIG;
+-
+-    let subscription: { remove: () => void } | null = null;
+-    let mounted = true;
+-// Calibra com a média das primeiras leituras (mais estável que uma só)
+-    const CALIBRATION_SAMPLES = 10;
+-    let calibSum = 0;
+-    let calibCount = 0;
+-    const startSensor = async () => {
+-      try {
+-        const available = await Accelerometer.isAvailableAsync();
+-        if (!available || !mounted) return;
+-
+-        Accelerometer.setUpdateInterval(TILT_UPDATE_INTERVAL);
+-
+-        subscription = Accelerometer.addListener(({ x }) => {
+-          if (!mounted) return;
+-
+-          // Primeiras leituras: a média delas vira a posição neutra.
+-          if (baselineX.current === null) {
+-            calibSum += x;
+-            calibCount += 1;
+-            if (calibCount >= CALIBRATION_SAMPLES) {
+-              baselineX.current = calibSum / calibCount;
+-            }
+-            return;
+-          }
+-          const diff = x - baselineX.current;
+-
+-          // Zona morta contínua: abaixo do limite vale 0 e, acima, o valor
+-          // cresce a partir de 0 (sem "pulo" ao sair da zona morta).
+-          const rawX =
+-            Math.abs(diff) < TILT_DEADZONE
+-              ? 0
+-              : diff - Math.sign(diff) * TILT_DEADZONE;
+-
+-          // Suavização: quanto maior o alpha, mais rápido responde.
+-          smoothedX.current =
+-            smoothedX.current * (1 - TILT_SMOOTHING_ALPHA) +
+-            rawX * TILT_SMOOTHING_ALPHA;
+-
+-          // Normaliza para -1..1
+-          const normalized = Math.max(
+-            -1,
+-            Math.min(1, smoothedX.current / (TILT_MAX_TILT - TILT_DEADZONE))
+-          );
+-
+-          tiltX.current = normalized * TILT_INVERT_X;
+-        });
+-      } catch (error) {
+-        console.warn("Erro ao iniciar acelerômetro:", error);
+-      }
+-    };
+-
+-    startSensor();
+-
+-    return () => {
+-      mounted = false;
+-      subscription?.remove();
+-      subscription = null;
+-      baselineX.current = null;
+-      smoothedX.current = 0;
+-      tiltX.current = 0;
+-    };
+-  }, [enabled]);
+-
+-  return tiltX;
+-}
+diff --git a/src/types/ranking.tsx b/src/types/ranking.tsx
+index 0c74aed..069140e 100644
+--- a/src/types/ranking.tsx
++++ b/src/types/ranking.tsx
+@@ -9,6 +9,8 @@ export interface UserProfile {
+   provider: AuthProviderId;
+   email?: string;
+   avatarUrl?: string;
++  /** true = identidade confirmada pelo servidor; false = login feito só no aparelho */
++  verified?: boolean;
+   /** Token de sessão devolvido pelo servidor (vazio enquanto não há servidor). */
+   token?: string;
+   createdAt: number;
