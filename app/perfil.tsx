@@ -1,29 +1,26 @@
 // app/perfil.tsx
 import React, { useEffect, useState } from "react";
 import {
-  View,
+  ActivityIndicator,
+  Alert,
+  Image,
+  Linking,
+  Pressable,
+  ScrollView,
+  StatusBar,
   Text,
   TextInput,
   TouchableOpacity,
-  Alert,
-  StatusBar,
-  ScrollView,
+  View,
 } from "react-native";
 import { useRouter } from "expo-router";
 
+import HomeSky from "../src/components/Sky/HomeSky";
 import { useAuth } from "../src/hooks/useAuth";
-import { isServerConfigured } from "../src/config/server";
+import { useGoogleSignIn } from "../src/hooks/useGoogleSignIn";
+import { deleteAllLocalData } from "../src/services/auth";
+import { PRIVACY_URL } from "../src/config/server";
 import { AuthProviderId } from "../src/types/ranking";
-
-const PROVIDERS: {
-  id: Exclude<AuthProviderId, "guest">;
-  label: string;
-  icon: string;
-}[] = [
-  { id: "google", label: "Entrar com Google", icon: "G" },
-  { id: "apple", label: "Entrar com Apple", icon: "" },
-  { id: "facebook", label: "Entrar com Facebook", icon: "f" },
-];
 
 const PROVIDER_NAMES: Record<AuthProviderId, string> = {
   guest: "Convidado",
@@ -32,13 +29,23 @@ const PROVIDER_NAMES: Record<AuthProviderId, string> = {
   facebook: "Facebook",
 };
 
+const LABEL = {
+  color: "rgba(180,210,255,0.8)",
+  fontSize: 11,
+  letterSpacing: 2,
+  fontWeight: "700" as const,
+  marginBottom: 8,
+};
+
 export default function PerfilScreen() {
   const router = useRouter();
-  const { user, isGuest, updateName, signOut, isProviderConfigured } =
-    useAuth();
+  const { user, isGuest, updateName, signOut, isProviderConfigured } = useAuth();
 
   const [name, setName] = useState("");
   const [saved, setSaved] = useState(false);
+
+  const google = useGoogleSignIn();
+  const googleReady = isProviderConfigured("google");
 
   useEffect(() => {
     if (user) setName(user.name);
@@ -50,37 +57,6 @@ export default function PerfilScreen() {
     setTimeout(() => setSaved(false), 1500);
   };
 
-  const handleProvider = (id: Exclude<AuthProviderId, "guest">) => {
-    const label = PROVIDER_NAMES[id];
-
-    if (!isProviderConfigured(id)) {
-      Alert.alert(
-        `Login com ${label}`,
-        "Este método ainda não foi configurado.\n\n" +
-          "O desenvolvedor precisa criar o app no painel do serviço e " +
-          "preencher os IDs em src/config/server.tsx (AUTH_CONFIG)."
-      );
-      return;
-    }
-
-    if (!isServerConfigured()) {
-      Alert.alert(
-        `Login com ${label}`,
-        "Falta ligar o servidor do jogo (SERVER_CONFIG.API_URL), " +
-          "que valida o login e guarda a conta."
-      );
-      return;
-    }
-
-    // TODO: iniciar o fluxo do provedor, obter o token e chamar
-    // signInWithProviderToken(id, token). Veja src/services/auth.tsx.
-    Alert.alert(
-      `Login com ${label}`,
-      "Configuração encontrada, mas o fluxo do provedor ainda não foi " +
-        "conectado nesta tela. Veja o passo a passo em src/services/auth.tsx."
-    );
-  };
-
   const handleSignOut = () => {
     Alert.alert("Sair da conta", "Voltar para o perfil de convidado?", [
       { text: "Cancelar", style: "cancel" },
@@ -88,236 +64,241 @@ export default function PerfilScreen() {
     ]);
   };
 
+  const handleDelete = () => {
+    Alert.alert(
+      "Apagar meus dados",
+      "Isso apaga seu perfil, seu ranking, suas naves e suas estatísticas deste aparelho. Não dá para desfazer.",
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Apagar tudo",
+          style: "destructive",
+          onPress: async () => {
+            await deleteAllLocalData();
+            router.replace("/login");
+          },
+        },
+      ]
+    );
+  };
+
   return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: "#05051a" }}
-      contentContainerStyle={{ padding: 20, paddingTop: 54 }}
-      keyboardShouldPersistTaps="handled"
-    >
+    <View style={{ flex: 1, backgroundColor: "#05051a" }}>
       <StatusBar hidden />
+      <HomeSky />
 
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          marginBottom: 24,
-        }}
+      <ScrollView
+        contentContainerStyle={{ padding: 20, paddingTop: 54, paddingBottom: 40 }}
+        keyboardShouldPersistTaps="handled"
       >
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={{ padding: 8, marginRight: 8 }}
-        >
-          <Text style={{ color: "#00D9FF", fontSize: 22 }}>←</Text>
-        </TouchableOpacity>
+        {/* Topo */}
+        <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 24 }}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={{ padding: 8, marginRight: 8 }}
+          >
+            <Text style={{ color: "#00D9FF", fontSize: 22 }}>←</Text>
+          </TouchableOpacity>
 
-        <Text
-          style={{
-            color: "#fff",
-            fontSize: 20,
-            fontWeight: "900",
-            letterSpacing: 4,
-          }}
-        >
-          👤 PERFIL
-        </Text>
-      </View>
+          <Text style={{ color: "#fff", fontSize: 20, fontWeight: "900", letterSpacing: 4 }}>
+            👤 PERFIL
+          </Text>
+        </View>
 
-      {/* Cartão do jogador */}
-      <View
-        style={{
-          alignItems: "center",
-          padding: 20,
-          borderRadius: 20,
-          backgroundColor: "rgba(255,255,255,0.05)",
-          borderWidth: 1,
-          borderColor: "rgba(0,217,255,0.25)",
-          marginBottom: 22,
-        }}
-      >
+        {/* Cartão do jogador */}
         <View
           style={{
-            width: 74,
-            height: 74,
-            borderRadius: 37,
-            backgroundColor: "rgba(0,217,255,0.2)",
-            borderWidth: 2,
-            borderColor: "#00D9FF",
             alignItems: "center",
-            justifyContent: "center",
-            marginBottom: 10,
+            padding: 20,
+            borderRadius: 20,
+            backgroundColor: "rgba(0,0,20,0.55)",
+            borderWidth: 1,
+            borderColor: "rgba(0,217,255,0.3)",
+            marginBottom: 22,
           }}
         >
-          <Text style={{ fontSize: 32, color: "#fff", fontWeight: "800" }}>
-            {(user?.name || "P").charAt(0).toUpperCase()}
+          {user?.avatarUrl ? (
+            <Image
+              source={{ uri: user.avatarUrl }}
+              style={{
+                width: 74,
+                height: 74,
+                borderRadius: 37,
+                borderWidth: 2,
+                borderColor: "#00D9FF",
+                marginBottom: 10,
+              }}
+            />
+          ) : (
+            <View
+              style={{
+                width: 74,
+                height: 74,
+                borderRadius: 37,
+                backgroundColor: "rgba(0,217,255,0.2)",
+                borderWidth: 2,
+                borderColor: "#00D9FF",
+                alignItems: "center",
+                justifyContent: "center",
+                marginBottom: 10,
+              }}
+            >
+              <Text style={{ fontSize: 32, color: "#fff", fontWeight: "800" }}>
+                {(user?.name || "P").charAt(0).toUpperCase()}
+              </Text>
+            </View>
+          )}
+
+          <Text style={{ color: "#fff", fontSize: 18, fontWeight: "800", marginBottom: 4 }}>
+            {user?.name ?? "..."}
           </Text>
+
+          <Text style={{ color: "rgba(180,210,255,0.7)", fontSize: 11, letterSpacing: 2 }}>
+            CONTA: {user ? PROVIDER_NAMES[user.provider].toUpperCase() : "..."}
+          </Text>
+
+          {user?.email ? (
+            <Text style={{ color: "rgba(255,255,255,0.6)", fontSize: 12, marginTop: 2 }}>
+              {user.email}
+            </Text>
+          ) : null}
         </View>
 
-        <Text
-          style={{
-            color: "rgba(180,210,255,0.7)",
-            fontSize: 11,
-            letterSpacing: 2,
-          }}
-        >
-          CONTA: {user ? PROVIDER_NAMES[user.provider].toUpperCase() : "..."}
-        </Text>
+        {/* Nome */}
+        <Text style={LABEL}>NOME NO RANKING</Text>
 
-        {user?.email ? (
-          <Text style={{ color: "rgba(255,255,255,0.6)", fontSize: 12 }}>
-            {user.email}
-          </Text>
-        ) : null}
-      </View>
-
-      {/* Nome */}
-      <Text
-        style={{
-          color: "rgba(180,210,255,0.7)",
-          fontSize: 11,
-          letterSpacing: 2,
-          marginBottom: 8,
-        }}
-      >
-        NOME NO RANKING
-      </Text>
-
-      <View style={{ flexDirection: "row", gap: 10, marginBottom: 28 }}>
-        <TextInput
-          value={name}
-          onChangeText={setName}
-          maxLength={16}
-          placeholder="Seu nome"
-          placeholderTextColor="rgba(255,255,255,0.3)"
-          style={{
-            flex: 1,
-            color: "#fff",
-            fontSize: 16,
-            paddingHorizontal: 16,
-            paddingVertical: 12,
-            borderRadius: 14,
-            backgroundColor: "rgba(255,255,255,0.07)",
-            borderWidth: 1,
-            borderColor: "rgba(255,255,255,0.15)",
-          }}
-        />
-
-        <TouchableOpacity
-          onPress={handleSaveName}
-          style={{
-            paddingHorizontal: 20,
-            justifyContent: "center",
-            borderRadius: 14,
-            backgroundColor: saved ? "#22aa55" : "#e01111",
-          }}
-        >
-          <Text style={{ color: "#fff", fontWeight: "800" }}>
-            {saved ? "✓" : "SALVAR"}
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Login social */}
-      <Text
-        style={{
-          color: "rgba(180,210,255,0.7)",
-          fontSize: 11,
-          letterSpacing: 2,
-          marginBottom: 8,
-        }}
-      >
-        {isGuest ? "ENTRAR NA SUA CONTA" : "CONTA CONECTADA"}
-      </Text>
-
-      {isGuest ? (
-        <View style={{ gap: 10 }}>
-          {PROVIDERS.map((p) => {
-            const ready = isProviderConfigured(p.id);
-
-            return (
-              <TouchableOpacity
-                key={p.id}
-                onPress={() => handleProvider(p.id)}
-                activeOpacity={0.8}
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  paddingVertical: 14,
-                  paddingHorizontal: 18,
-                  borderRadius: 14,
-                  backgroundColor: "rgba(255,255,255,0.06)",
-                  borderWidth: 1,
-                  borderColor: "rgba(255,255,255,0.15)",
-                  opacity: ready ? 1 : 0.6,
-                }}
-              >
-                <Text
-                  style={{
-                    width: 28,
-                    color: "#fff",
-                    fontSize: 18,
-                    fontWeight: "900",
-                  }}
-                >
-                  {p.icon}
-                </Text>
-
-                <Text
-                  style={{
-                    flex: 1,
-                    color: "#fff",
-                    fontSize: 14,
-                    fontWeight: "700",
-                  }}
-                >
-                  {p.label}
-                </Text>
-
-                {!ready && (
-                  <Text
-                    style={{
-                      color: "#FFD700",
-                      fontSize: 10,
-                      fontWeight: "800",
-                      letterSpacing: 1,
-                    }}
-                  >
-                    EM BREVE
-                  </Text>
-                )}
-              </TouchableOpacity>
-            );
-          })}
-
-          <Text
+        <View style={{ flexDirection: "row", gap: 10, marginBottom: 28 }}>
+          <TextInput
+            value={name}
+            onChangeText={setName}
+            maxLength={16}
+            placeholder="Seu nome"
+            placeholderTextColor="rgba(255,255,255,0.35)"
             style={{
-              color: "rgba(255,255,255,0.45)",
-              fontSize: 12,
-              lineHeight: 18,
-              marginTop: 6,
+              flex: 1,
+              color: "#fff",
+              fontSize: 16,
+              paddingHorizontal: 16,
+              paddingVertical: 12,
+              borderRadius: 14,
+              backgroundColor: "rgba(255,255,255,0.1)",
+              borderWidth: 1,
+              borderColor: "rgba(255,255,255,0.2)",
+            }}
+          />
+
+          <TouchableOpacity
+            onPress={handleSaveName}
+            style={{
+              paddingHorizontal: 20,
+              justifyContent: "center",
+              borderRadius: 14,
+              backgroundColor: saved ? "#22aa55" : "#e01111",
             }}
           >
-            Por enquanto você joga como convidado e seus resultados ficam
-            salvos neste aparelho. Com login, seus pontos passam a ficar
-            ligados à sua conta no ranking mundial.
-          </Text>
+            <Text style={{ color: "#fff", fontWeight: "800" }}>{saved ? "✓" : "SALVAR"}</Text>
+          </TouchableOpacity>
         </View>
-      ) : (
-        <TouchableOpacity
-          onPress={handleSignOut}
-          style={{
-            paddingVertical: 14,
-            borderRadius: 14,
-            alignItems: "center",
-            backgroundColor: "rgba(255,70,70,0.12)",
-            borderWidth: 1,
-            borderColor: "rgba(255,70,70,0.4)",
-          }}
-        >
-          <Text style={{ color: "#ff6b6b", fontWeight: "800" }}>
-            SAIR DA CONTA
-          </Text>
-        </TouchableOpacity>
-      )}
-    </ScrollView>
+
+        {/* Conta */}
+        <Text style={LABEL}>{isGuest ? "ENTRAR NA SUA CONTA" : "CONTA CONECTADA"}</Text>
+
+        {isGuest ? (
+          googleReady ? (
+            <View style={{ gap: 8 }}>
+              <Pressable
+                onPress={google.signIn}
+                disabled={google.busy || !google.ready}
+                style={({ pressed }) => ({
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 12,
+                  paddingVertical: 15,
+                  borderRadius: 50,
+                  backgroundColor: pressed ? "#e8e8e8" : "#fff",
+                  opacity: google.busy ? 0.7 : 1,
+                })}
+              >
+                {google.busy ? (
+                  <ActivityIndicator color="#333" />
+                ) : (
+                  <Text style={{ fontSize: 18, fontWeight: "900", color: "#4285F4" }}>G</Text>
+                )}
+                <Text style={{ color: "#222", fontWeight: "800", fontSize: 14, letterSpacing: 1 }}>
+                  ENTRAR COM GOOGLE
+                </Text>
+              </Pressable>
+
+              {google.error && (
+                <Text style={{ color: "#ff8a8a", fontSize: 12, textAlign: "center" }}>
+                  {google.error}
+                </Text>
+              )}
+
+              <Text style={{ color: "rgba(255,255,255,0.5)", fontSize: 12, lineHeight: 18 }}>
+                Com login, seus pontos ficam ligados à sua conta.
+              </Text>
+            </View>
+          ) : (
+            <Text style={{ color: "rgba(255,255,255,0.55)", fontSize: 12, lineHeight: 18 }}>
+              Você joga como convidado e seus resultados ficam salvos neste aparelho.
+              O login com Google chega em breve.
+            </Text>
+          )
+        ) : (
+          <TouchableOpacity
+            onPress={handleSignOut}
+            style={{
+              paddingVertical: 14,
+              borderRadius: 14,
+              alignItems: "center",
+              backgroundColor: "rgba(255,70,70,0.12)",
+              borderWidth: 1,
+              borderColor: "rgba(255,70,70,0.4)",
+            }}
+          >
+            <Text style={{ color: "#ff6b6b", fontWeight: "800" }}>SAIR DA CONTA</Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Privacidade e dados */}
+        <Text style={[LABEL, { marginTop: 32 }]}>PRIVACIDADE E DADOS</Text>
+
+        <View style={{ gap: 10 }}>
+          <TouchableOpacity
+            onPress={() => Linking.openURL(PRIVACY_URL)}
+            style={{
+              paddingVertical: 14,
+              borderRadius: 14,
+              alignItems: "center",
+              backgroundColor: "rgba(255,255,255,0.08)",
+              borderWidth: 1,
+              borderColor: "rgba(255,255,255,0.15)",
+            }}
+          >
+            <Text style={{ color: "rgba(255,255,255,0.8)", fontWeight: "700", fontSize: 13 }}>
+              Política de Privacidade
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={handleDelete}
+            style={{
+              paddingVertical: 14,
+              borderRadius: 14,
+              alignItems: "center",
+              backgroundColor: "rgba(255,70,70,0.1)",
+              borderWidth: 1,
+              borderColor: "rgba(255,70,70,0.35)",
+            }}
+          >
+            <Text style={{ color: "#ff6b6b", fontWeight: "800", fontSize: 13 }}>
+              APAGAR MEUS DADOS
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </View>
   );
 }
