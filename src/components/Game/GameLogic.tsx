@@ -42,6 +42,7 @@ import {
 import { createEnemy, updateEnemy } from "../../game/enemies";
 
 import { ScriptStep, buildStageScript } from "../../game/stages";
+import { themeForStage } from "../../game/theme";
 
 /**
  * ============================================================
@@ -260,7 +261,7 @@ export function useGameLogic(shipId?: string) {
     setObstacles(initialObstacles);
     setCollectibles(initialCollectibles);
 
-    showBanner("FASE 1", 2000);
+    showBanner(`FASE 1 · ${themeForStage(1).label}`, 2000);
   }, []);
 
   // ==========================================================
@@ -547,7 +548,7 @@ export function useGameLogic(shipId?: string) {
           stageTickRef.current = -GAME_CONFIG.STAGE_INTRO_TICKS;
           stagePhase.current = "play";
 
-          showBanner(`FASE ${ns}`, 2000);
+          showBanner(`FASE ${ns} · ${themeForStage(ns).label}`, 2600);
         }
       } else {
         // O relógio da fase para enquanto há chefão
@@ -1333,7 +1334,7 @@ export function useGameLogic(shipId?: string) {
 
     setPlayer({ x: startX, y: startY, angle: 0 });
 
-    showBanner("FASE 1", 2000);
+    showBanner(`FASE 1 · ${themeForStage(1).label}`, 2000);
   }
 
   // ==========================================================

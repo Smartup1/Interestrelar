@@ -22,7 +22,7 @@ import {
 } from "../../types/game";
 
 import { WIDTH, HEIGHT } from "../../constants/gameConfig";
-import { stageTint } from "../../game/stages";
+import SkyBackground, { useSkyTransition } from "./SkyBackground";
 
 interface GameRendererProps {
   stars: Star[];
@@ -977,23 +977,6 @@ const ScrollingStars = memo(function ScrollingStars() {
   );
 });
 
-/** Cor de cada fase (camada translúcida sobre o fundo). */
-const StageTint = memo(function StageTint({ stage }: { stage: number }) {
-  return (
-    <View
-      pointerEvents="none"
-      style={{
-        position: "absolute",
-        left: 0,
-        top: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: stageTint(stage),
-      }}
-    />
-  );
-});
-
 /**
  * ============================================================
  * GAME RENDERER
@@ -1023,6 +1006,8 @@ function GameRenderer({
    * ANIMAÇÃO GLOBAL DAS ESTRELAS
    * ============================================================
    */
+
+  const sky = useSkyTransition(stage);
 
   const starTwinkle = useRef(
     new Animated.Value(0)
@@ -1122,23 +1107,47 @@ function GameRenderer({
           FUNDO
       ====================================================== */}
 
-      <Nebula />
+      <SkyBackground opacities={sky.opacities} />
 
-      <StageTint stage={stage} />
-
-      <ScrollingStars />
+      {/* Nebulosas e estrelas somem aos poucos durante o dia */}
+      <Animated.View
+        pointerEvents="none"
+        style={{
+          position: "absolute",
+          left: 0,
+          top: 0,
+          right: 0,
+          bottom: 0,
+          opacity: sky.starAlpha,
+        }}
+      >
+        <Nebula />
+        <ScrollingStars />
+      </Animated.View>
 
       {/* ======================================================
           ESTRELAS
       ====================================================== */}
 
-      {stars.map((star) => (
-        <TwinkleStar
-          key={star.id}
-          star={star}
-          twinkle={starTwinkle}
-        />
-      ))}
+      <Animated.View
+        pointerEvents="none"
+        style={{
+          position: "absolute",
+          left: 0,
+          top: 0,
+          right: 0,
+          bottom: 0,
+          opacity: sky.starAlpha,
+        }}
+      >
+        {stars.map((star) => (
+          <TwinkleStar
+            key={star.id}
+            star={star}
+            twinkle={starTwinkle}
+          />
+        ))}
+      </Animated.View>
 
       {/* ======================================================
           TRAIL
