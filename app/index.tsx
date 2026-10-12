@@ -14,7 +14,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter, useFocusEffect } from 'expo-router';
 import Constants from 'expo-constants';
-
+import MenuMusic from '../src/components/Audio/MenuMusic';
 import HomeSky from '../src/components/Sky/HomeSky';
 import { useDailyCredits } from '../src/hooks/useDailyCredits';
 import { useAuth } from '../src/hooks/useAuth';
@@ -504,7 +504,7 @@ export default function HomeScreen() {
     <View style={{ flex: 1, backgroundColor: '#000010' }}>
       <StatusBar hidden />
       <HomeSky />
-
+      <MenuMusic />
       {checked && (
         <View
           style={{
