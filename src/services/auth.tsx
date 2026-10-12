@@ -52,6 +52,8 @@ import { AuthProviderId, UserProfile } from "../types/ranking";
 
 const USER_KEY = "@interestrelar/user/v1";
 const GUEST_KEY = "@interestrelar/guest/v1";
+const ONBOARDED_KEY = "@interestrelar/onboarded/v1";
+const APP_KEY_PREFIX = "@interestrelar/";
 
 // ------------------------------------------------------------
 // STORE (estado global simples)
@@ -207,6 +209,30 @@ export async function signInWithProviderToken(
   token: string
 ): Promise<UserProfile> {
   if (!isServerConfigured()) {
+    // Sem servidor não há como VALIDAR o token. Para o Google, usamos só os
+    // dados públicos do perfil (nome, e-mail, foto) lidos do próprio token.
+    // O perfil fica marcado como não verificado (verified: false) e o ranking
+    // global só passa a confiar nele quando o servidor existir.
+    if (provider === "google") {
+      const claims = decodeJwtPayload(token);
+      if (!claims?.sub) {
+        throw new Error("AUTH_FAILED: token do Google inválido");
+      }
+
+      const user: UserProfile = {
+        id: `google_${String(claims.sub)}`,
+        name: String(claims.given_name || claims.name || "Piloto").slice(0, 16),
+        provider: "google",
+        email: typeof claims.email === "string" ? claims.email : undefined,
+        avatarUrl: typeof claims.picture === "string" ? claims.picture : undefined,
+        verified: false,
+        createdAt: Date.now(),
+      };
+
+      setUser(user);
+      return user;
+    }
+
     throw new Error(
       "SERVER_NOT_CONFIGURED: configure SERVER_CONFIG.API_URL para entrar com " +
         provider
@@ -237,6 +263,7 @@ export async function signInWithProviderToken(
       email: data.email,
       avatarUrl: data.avatarUrl,
       token: data.token,
+      verified: true,
       createdAt: Date.now(),
     };
 
@@ -254,4 +281,74 @@ export async function signOut(): Promise<void> {
   loadPromise = null;
   const guest = await getOrCreateGuest();
   setUser(guest);
+}
+
+// ------------------------------------------------------------
+// PRIMEIRO ACESSO (tela de boas-vindas / login)
+// ------------------------------------------------------------
+
+export async function hasOnboarded(): Promise<boolean> {
+  try {
+    return (await AsyncStorage.getItem(ONBOARDED_KEY)) === "1";
+  } catch {
+    return true; // na dúvida, não trava o jogador na tela de boas-vindas
+  }
+}
+
+export async function markOnboarded(): Promise<void> {
+  try {
+    await AsyncStorage.setItem(ONBOARDED_KEY, "1");
+  } catch {}
+}
+
+/** Entra como convidado já com o apelido escolhido. */
+export async function continueAsGuest(name?: string): Promise<void> {
+  await loadUser();
+  if (name && name.trim()) await updateName(name);
+  await markOnboarded();
+}
+
+// ------------------------------------------------------------
+// APAGAR DADOS (exigido pela Play Store: o jogador precisa poder
+// apagar o que o app guarda sobre ele)
+// ------------------------------------------------------------
+
+/** Apaga perfil, ranking local, naves, jogadas e tudo que o app guardou. */
+export async function deleteAllLocalData(): Promise<void> {
+  try {
+    const keys = await AsyncStorage.getAllKeys();
+    const mine = keys.filter((k) => k.startsWith(APP_KEY_PREFIX));
+    if (mine.length > 0) await AsyncStorage.multiRemove(mine);
+  } catch (e) {
+    console.warn("Erro ao apagar dados:", e);
+  }
+
+  current = null;
+  loadPromise = null;
+  emit();
+}
+
+// ------------------------------------------------------------
+// UTILITÁRIOS
+// ------------------------------------------------------------
+
+/** Lê o conteúdo (claims) de um JWT SEM validar a assinatura. */
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  try {
+    const part = token.split(".")[1];
+    if (!part) return null;
+
+    const b64 = part.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = b64 + "=".repeat((4 - (b64.length % 4)) % 4);
+    const binary = atob(padded);
+
+    // UTF-8 (nomes com acento)
+    const utf8 = Array.from(binary)
+      .map((c) => "%" + c.charCodeAt(0).toString(16).padStart(2, "0"))
+      .join("");
+
+    return JSON.parse(decodeURIComponent(utf8));
+  } catch {
+    return null;
+  }
 }

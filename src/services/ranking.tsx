@@ -41,6 +41,7 @@ import {
 } from "../types/ranking";
 
 const LOCAL_KEY = "@interestrelar/ranking/v1";
+const STATS_KEY = "@interestrelar/stats/v1";
 const MAX_LOCAL_ENTRIES = 100;
 
 // ------------------------------------------------------------
@@ -187,12 +188,53 @@ export async function getGlobalRanking(
 }
 
 // ------------------------------------------------------------
+// ESTATÍSTICAS DO JOGADOR (tela inicial)
+// ------------------------------------------------------------
+
+export interface PlayerStats {
+  best: number;
+  games: number;
+  gems: number;
+}
+
+async function readStats(): Promise<{ games: number; gems: number }> {
+  try {
+    const raw = await AsyncStorage.getItem(STATS_KEY);
+    if (raw) {
+      const p = JSON.parse(raw);
+      return { games: Number(p.games) || 0, gems: Number(p.gems) || 0 };
+    }
+  } catch {}
+  return { games: 0, gems: 0 };
+}
+
+async function addToStats(gems: number): Promise<void> {
+  try {
+    const cur = await readStats();
+    await AsyncStorage.setItem(
+      STATS_KEY,
+      JSON.stringify({
+        games: cur.games + 1,
+        gems: cur.gems + (Number.isFinite(gems) ? Math.floor(gems) : 0),
+      })
+    );
+  } catch {}
+}
+
+export async function getPlayerStats(): Promise<PlayerStats> {
+  const [best, s] = await Promise.all([getBestLocalScore(), readStats()]);
+  return { best, games: s.games, gems: s.gems };
+}
+
+// ------------------------------------------------------------
 // ENVIAR RESULTADO (chamado no fim de cada partida)
 // ------------------------------------------------------------
 
 export async function submitScore(
   input: SubmitScoreInput
 ): Promise<SubmitScoreResult | null> {
+  void addToStats(input.gems);
+
   if (!Number.isFinite(input.score) || input.score <= 0) return null;
 
   const user = await loadUser();
