@@ -10,9 +10,7 @@ import {
   View,
 } from "react-native";
 
-import {
-  Ship,
-} from "../../types/ships";
+import type { Ship } from "../types/ships";
 
 interface ShipCardProps {
   ship: Ship;
