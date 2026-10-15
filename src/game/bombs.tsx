@@ -26,6 +26,20 @@ export interface BombProfile {
   /** se > 0, só atinge o que estiver numa faixa vertical desse tamanho
    *  (metade da largura, px) em volta da nave */
   laneHalfWidth: number;
+  /** se existir, a bomba é um LASER: um feixe que fica ligado na frente da
+   *  nave por alguns segundos, causando dano a cada instante */
+  laser?: LaserSpec;
+}
+
+export interface LaserSpec {
+  /** metade da largura do feixe (px) */
+  halfWidth: number;
+  /** quanto tempo fica ligado (ticks do jogo, 1 tick ≈ 60ms) */
+  durationTicks: number;
+  /** dano por tick em cada inimigo atingido */
+  enemyDmgPerTick: number;
+  /** cor do núcleo do feixe */
+  coreColor: string;
 }
 
 const base = {
@@ -59,9 +73,9 @@ export const BOMB_PROFILES: Record<string, BombProfile> = {
     laneHalfWidth: 0,
   },
 
-  // ☄️ Titan: meteoro que arrasa o chefão, mas NÃO apaga os tiros
+  // ☄️ Titan: MEGA LASER - feixe largo que arrasa o chefão
   titan: {
-    name: "METEORO",
+    name: "MEGA LASER",
     color: "#ff7043",
     enemyDamage: base.enemyDamage,
     bossPct: base.bossPct * 2.5,
@@ -70,6 +84,12 @@ export const BOMB_PROFILES: Record<string, BombProfile> = {
     clearObstacles: true,
     pointsPerClear: 0,
     laneHalfWidth: 0,
+    laser: {
+      halfWidth: 46,
+      durationTicks: 44,
+      enemyDmgPerTick: 4,
+      coreColor: "#fff3e0",
+    },
   },
 
   // 👾 Phantom: pulso que te deixa invulnerável por muito mais tempo
@@ -85,7 +105,7 @@ export const BOMB_PROFILES: Record<string, BombProfile> = {
     laneHalfWidth: 0,
   },
 
-  // 🌌 Nebula: laser em faixa vertical - devasta só o que está na sua frente
+  // 🌌 Nebula: LASER - feixe fino e longo, estilo Aero Fighters
   nebula: {
     name: "LASER",
     color: "#f48fb1",
@@ -96,6 +116,12 @@ export const BOMB_PROFILES: Record<string, BombProfile> = {
     clearObstacles: true,
     pointsPerClear: 0,
     laneHalfWidth: 80,
+    laser: {
+      halfWidth: 26,
+      durationTicks: 36,
+      enemyDmgPerTick: 3,
+      coreColor: "#ffffff",
+    },
   },
 
   // ✨ Aurora: transforma tiros e asteroides apagados em pontos

@@ -16,6 +16,7 @@ import GameRenderer, { ShieldEffect } from "./GameRenderer";
 import { useGameLogic } from "./GameLogic";
 import { useSounds } from "../../utils/useSounds";
 import { getBombProfile } from "../../game/bombs";
+import LaserBeam from "./LaserBeam";
 import { createPulseAnimation } from "../../utils/animations";
 
 import {
@@ -84,6 +85,7 @@ export default function Game() {
 
     shoot,
     fireBomb,
+    laser,
     isInvulnerable,
     restartGame,
     movePlayer,
@@ -98,6 +100,7 @@ export default function Game() {
     playExplosion,
     playCollect,
     playSfx,
+    setMusic,
     stopBackground,
     resumeBackground,
   } = useSounds();
@@ -165,6 +168,19 @@ export default function Game() {
   // A lógica avisa o que aconteceu em `fx`; aqui a gente reage.
   // ============================================================
 
+  // ============================================================
+  // MÚSICA
+  //   fase   -> a música antiga
+  //   chefão -> a música nova (volta para a da fase quando ele cai)
+  // O mini-chefe usa a música da fase.
+  // ============================================================
+
+  const bossMusic = !!boss && !boss.isMid;
+
+  useEffect(() => {
+    setMusic(bossMusic ? "boss" : "game");
+  }, [bossMusic]);
+
   const shake = useRef(new Animated.Value(0)).current;
   const flash = useRef(new Animated.Value(0)).current;
   const [flashColor, setFlashColor] = useState("#ffffff");
@@ -207,6 +223,12 @@ export default function Game() {
           setFlashColor(getBombProfile(selectedShip?.id).color);
           runFlash(0.85, 500);
           runShake(10);
+          break;
+        case "laser":
+          playSfx("laser");
+          setFlashColor(getBombProfile(selectedShip?.id).color);
+          runFlash(0.5, 350);
+          runShake(5);
           break;
         case "bossdead":
           playSfx("bossdead");
@@ -701,6 +723,28 @@ export default function Game() {
           </Animated.View>
         </Animated.View>
 
+        {/* LASER: acompanha a nave, mas fica FORA dela para não piscar junto */}
+        {laser && (
+          <Animated.View
+            pointerEvents="none"
+            style={{
+              position: "absolute",
+              left: 0,
+              top: 0,
+              width: 90,
+              height: 90,
+              zIndex: 9,
+              transform: shipPos.getTranslateTransform(),
+            }}
+          >
+            <LaserBeam
+              color={laser.color}
+              coreColor={laser.coreColor}
+              halfWidth={laser.halfWidth}
+            />
+          </Animated.View>
+        )}
+
         {/* ====================================================
             NÍVEL DE TIRO
         ==================================================== */}
@@ -927,7 +971,7 @@ export default function Game() {
           }
 
           onHome={() =>
-            router.push("/")
+            router.dismissTo("/")
           }
         />
 

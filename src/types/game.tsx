@@ -145,9 +145,17 @@ export type FxName =
   | "hurt"
   | "warning"
   | "stageclear"
-  | "bossdead";
+  | "bossdead"
+  | "laser";
 
 export interface FxEvent {
   id: number;
   name: FxName;
+}
+
+/** Laser ativo (bomba de feixe de algumas naves) */
+export interface LaserState {
+  color: string;
+  coreColor: string;
+  halfWidth: number;
 }

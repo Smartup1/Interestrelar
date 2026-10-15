@@ -22,6 +22,7 @@ import {
   Popup,
   FxEvent,
   FxName,
+  LaserState,
 } from "../../types/game";
 
 import {
@@ -92,6 +93,7 @@ export function useGameLogic(shipId?: string) {
   const [powerUps, setPowerUps] = useState<PowerUp[]>([]);
   const [enemies, setEnemies] = useState<Enemy[]>([]);
   const [boss, setBoss] = useState<Boss | null>(null);
+  const [laser, setLaser] = useState<LaserState | null>(null);
   const [popups, setPopups] = useState<Popup[]>([]);
   const [explosions, setExplosions] = useState<Explosion[]>([]);
   const [trail, setTrail] = useState<Trail[]>([]);
@@ -152,6 +154,15 @@ export function useGameLogic(shipId?: string) {
   // Bombas
   const bombsRef = useRef(GAME_CONFIG.START_BOMBS);
   const bombPending = useRef(false);
+
+  // Laser ativo (bomba de feixe): até quando dura e o dano por tick
+  const laserRef = useRef<{
+    until: number;
+    duration: number;
+    halfWidth: number;
+    enemyDmg: number;
+    bossPct: number;
+  } | null>(null);
   const lastBombTick = useRef(-100);
 
   // Combate
@@ -485,7 +496,24 @@ export function useGameLogic(shipId?: string) {
         const lane = bp.laneHalfWidth;
         const inLane = (x: number) => lane <= 0 || Math.abs(x - pcx) <= lane;
 
-        if (bp.clearBullets) {
+        if (bp.laser) {
+          // LASER: o feixe fica ligado na frente da nave; o dano é
+          // aplicado a cada tick, logo abaixo ("LASER ativo").
+          laserRef.current = {
+            until: tick + bp.laser.durationTicks,
+            duration: bp.laser.durationTicks,
+            halfWidth: bp.laser.halfWidth,
+            enemyDmg: bp.laser.enemyDmgPerTick,
+            bossPct: bp.bossPct,
+          };
+          setLaser({
+            color: bp.color,
+            coreColor: bp.laser.coreColor,
+            halfWidth: bp.laser.halfWidth,
+          });
+        }
+
+        if (!bp.laser && bp.clearBullets) {
           const kept = enemyBulletsRef.current.filter(
             (b) => lane > 0 && !inLane(b.x)
           );
@@ -494,7 +522,7 @@ export function useGameLogic(shipId?: string) {
           enemyBulletsRef.current = kept;
         }
 
-        if (bp.clearObstacles) {
+        if (!bp.laser && bp.clearObstacles) {
           for (let i = 0; i < nextObstacles.length; i++) {
             if (nextObstacles[i].y > -10 && inLane(nextObstacles[i].x)) {
               scoreRef.current += bp.pointsPerClear;
@@ -505,10 +533,10 @@ export function useGameLogic(shipId?: string) {
 
         for (let i = 0; i < nextEnemies.length; i++) {
           const en = nextEnemies[i];
-          if (en && inLane(en.x)) hitEnemy(i, bp.enemyDamage);
+          if (!bp.laser && en && inLane(en.x)) hitEnemy(i, bp.enemyDamage);
         }
 
-        if (boss && boss.y > -boss.size * 0.3 && inLane(boss.x)) {
+        if (!bp.laser && boss && boss.y > -boss.size * 0.3 && inLane(boss.x)) {
           const dmg = Math.max(25, Math.round(boss.maxHp * bp.bossPct));
           boss = { ...boss, hp: boss.hp - dmg, hitFlash: 3 };
           if (boss.hp <= 0) bossDefeated = true;
@@ -516,11 +544,66 @@ export function useGameLogic(shipId?: string) {
 
         invulnUntil.current = Math.max(
           invulnUntil.current,
-          tick + bp.invulnTicks
+          tick + (bp.laser ? bp.laser.durationTicks + 8 : bp.invulnTicks)
         );
 
         popup(pcx, pcy - 50, bp.name, bp.color);
-        fxQueue.current.push("bomb");
+        fxQueue.current.push(bp.laser ? "laser" : "bomb");
+      }
+
+      // ------------------------------------------------------
+      // LASER ativo: dano contínuo na faixa à frente da nave
+      // ------------------------------------------------------
+
+      const L = laserRef.current;
+
+      if (L) {
+        if (tick > L.until) {
+          laserRef.current = null;
+          setLaser(null);
+        } else {
+          // dentro do feixe? (extra = folga pelo tamanho do alvo)
+          const inBeam = (x: number, extra = 0) =>
+            Math.abs(x - pcx) <= L.halfWidth + extra;
+
+          // tiros inimigos que entram no feixe somem
+          enemyBulletsRef.current = enemyBulletsRef.current.filter(
+            (b) => !(b.y < pcy && inBeam(b.x, 6))
+          );
+
+          for (let i = 0; i < nextObstacles.length; i++) {
+            const o = nextObstacles[i];
+            if (
+              o.y > -10 &&
+              o.y < pcy &&
+              inBeam(o.x + o.fontSize / 2, o.fontSize * 0.4)
+            ) {
+              killObstacle(i);
+            }
+          }
+
+          for (let i = 0; i < nextEnemies.length; i++) {
+            const en = nextEnemies[i];
+            if (en && en.y < pcy && inBeam(en.x, en.size * 0.4)) {
+              hitEnemy(i, L.enemyDmg);
+            }
+          }
+
+          if (
+            boss &&
+            boss.y > -boss.size * 0.3 &&
+            boss.y < pcy &&
+            inBeam(boss.x, boss.size * 0.4)
+          ) {
+            const total = Math.max(25, boss.maxHp * L.bossPct);
+            boss = {
+              ...boss,
+              hp: boss.hp - total / L.duration,
+              hitFlash: 2,
+            };
+            if (boss.hp <= 0) bossDefeated = true;
+          }
+        }
       }
 
       // ======================================================
@@ -1237,6 +1320,7 @@ export function useGameLogic(shipId?: string) {
     if (gameOverRef.current) return;
     if (bombsRef.current <= 0) return;
     if (bombPending.current) return;
+    if (laserRef.current) return;
     if (
       tickRef.current - lastBombTick.current <
       GAME_CONFIG.BOMB_COOLDOWN_TICKS
@@ -1281,6 +1365,8 @@ export function useGameLogic(shipId?: string) {
 
     bombsRef.current = GAME_CONFIG.START_BOMBS;
     bombPending.current = false;
+    laserRef.current = null;
+    setLaser(null);
     lastBombTick.current = -100;
 
     invulnUntil.current = 0;
@@ -1408,6 +1494,7 @@ export function useGameLogic(shipId?: string) {
 
     shoot,
     fireBomb,
+    laser,
     isInvulnerable,
     restartGame,
     movePlayer,

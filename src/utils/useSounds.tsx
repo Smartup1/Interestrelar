@@ -1,26 +1,26 @@
 import { useEffect, useRef, useCallback } from "react";
 import { useAudioPlayer } from "expo-audio";
 
-// Sons locais do jogo — mantém a música atual da partida.
+import { music, MusicTrack } from "../services/MusicManager";
+
+// Efeitos sonoros do jogo.
+// A MÚSICA (menu, fase e chefão) fica no MusicManager: lá só toca uma
+// faixa por vez, não importa quantas telas existam ao mesmo tempo.
 const shootSound = require("../../assets/shoot.wav");
 const explosionSound = require("../../assets/explosion.wav");
 const collectSound = require("../../assets/collect.wav");
-const bgSound = require("../../assets/music-space.wav");
 
 const powerupSound = require("../../assets/sfx-powerup.wav");
 const bombSound = require("../../assets/sfx-bomb.wav");
 const hurtSound = require("../../assets/sfx-hurt.wav");
 const warningSound = require("../../assets/sfx-warning.wav");
 const stageClearSound = require("../../assets/sfx-stageclear.wav");
+const laserSound = require("../../assets/sfx-laser.wav");
 
-// Compartilhado entre instâncias de Game: evita duas músicas de jogo simultâneas.
-let activeBackgroundPlayer: ReturnType<typeof useAudioPlayer> | null = null;
-
+/** Para a música do jogo (se for ela que estiver tocando). */
 export function stopGameBackgroundMusic() {
-  try {
-    activeBackgroundPlayer?.pause();
-  } catch (error) {
-    console.log("Erro ao parar música do jogo:", error);
+  if (music.current === "game" || music.current === "boss") {
+    music.stop();
   }
 }
 
@@ -31,48 +31,30 @@ export type SfxName =
   | "bossdead"
   | "hurt"
   | "warning"
-  | "stageclear";
+  | "stageclear"
+  | "laser";
 
 export function useSounds() {
   const shoot = useAudioPlayer(shootSound);
   const explosion = useAudioPlayer(explosionSound);
   const collect = useAudioPlayer(collectSound);
-  const bg = useAudioPlayer(bgSound);
 
   const powerup = useAudioPlayer(powerupSound);
   const bomb = useAudioPlayer(bombSound);
   const hurt = useAudioPlayer(hurtSound);
   const warning = useAudioPlayer(warningSound);
   const stageClear = useAudioPlayer(stageClearSound);
+  const laser = useAudioPlayer(laserSound);
 
   const isMounted = useRef(true);
 
-  // Quando outra instância do jogo assume o áudio, a anterior é parada.
   useEffect(() => {
     isMounted.current = true;
 
-    if (activeBackgroundPlayer && activeBackgroundPlayer !== bg) {
-      try {
-        activeBackgroundPlayer.pause();
-      } catch (error) {
-        console.log("Erro ao interromper música anterior:", error);
-      }
-    }
-
-    activeBackgroundPlayer = bg;
-
-    try {
-      bg.loop = true;
-      bg.volume = 0.4;
-      bg.play();
-    } catch (error) {
-      console.log("Erro ao iniciar música do jogo:", error);
-    }
-
     return () => {
       isMounted.current = false;
+
       try {
-        bg.pause();
         shoot.pause();
         explosion.pause();
         collect.pause();
@@ -81,16 +63,16 @@ export function useSounds() {
         hurt.pause();
         warning.pause();
         stageClear.pause();
+        laser.pause();
       } catch (error) {
         console.log("Erro ao liberar sons:", error);
       }
 
-      // Uma tela antiga não deve limpar a referência de uma tela nova.
-      if (activeBackgroundPlayer === bg) {
-        activeBackgroundPlayer = null;
-      }
+      // Ao sair do jogo, para a música dele. Se o menu já assumiu a
+      // música, não mexe (isso só vale se ainda for a do jogo).
+      stopGameBackgroundMusic();
     };
-  }, [bg, shoot, explosion, collect, powerup, bomb, hurt, warning, stageClear]);
+  }, [shoot, explosion, collect, powerup, bomb, hurt, warning, stageClear, laser]);
 
   const playShoot = useCallback(() => {
     try {
@@ -141,6 +123,7 @@ export function useSounds() {
           hurt: [hurt, 0.9],
           warning: [warning, 0.8],
           stageclear: [stageClear, 0.9],
+          laser: [laser, 0.9],
         } as const;
 
         const [player, volume] = map[name];
@@ -151,38 +134,29 @@ export function useSounds() {
         console.log("Erro ao tocar efeito:", error);
       }
     },
-    [powerup, bomb, hurt, warning, stageClear]
+    [powerup, bomb, hurt, warning, stageClear, laser]
   );
 
+  // Música do jogo: "game" (a antiga) ou "boss" (a nova, do chefão).
+  // Tocar uma faixa pausa a outra, então nunca tocam duas juntas.
+  const setMusic = useCallback((track: MusicTrack) => {
+    music.play(track, track === "boss");
+  }, []);
+
   const stopBackground = useCallback(() => {
-    try {
-      if (isMounted.current) bg.pause();
-    } catch (error) {
-      console.log("Erro ao parar música:", error);
-    }
-  }, [bg]);
+    music.pause();
+  }, []);
 
   const resumeBackground = useCallback(() => {
-    try {
-      if (isMounted.current) {
-        if (activeBackgroundPlayer && activeBackgroundPlayer !== bg) {
-          activeBackgroundPlayer.pause();
-        }
-        activeBackgroundPlayer = bg;
-        bg.loop = true;
-        bg.volume = 0.4;
-        bg.play();
-      }
-    } catch (error) {
-      console.log("Erro ao retomar música:", error);
-    }
-  }, [bg]);
+    music.resume();
+  }, []);
 
   return {
     playShoot,
     playExplosion,
     playCollect,
     playSfx,
+    setMusic,
     stopBackground,
     resumeBackground,
   };
