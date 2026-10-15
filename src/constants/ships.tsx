@@ -57,6 +57,24 @@ export const SHIPS: Ship[] = [
     unlockScore: 20000,
     description: "Mista: tiro reto e laterais teleguiados.",
   },
+
+  {
+    id: "special",
+    name: "Special",
+    emoji: "🟣",
+    image: require("../../assets/ships/Nave-Special.png"),
+    unlockScore: 24000,
+    description: "Nave especial: laser roxo.",
+  },
+
+  {
+    id: "special-ouro",
+    name: "Special Ouro",
+    emoji: "🌟",
+    image: require("../../assets/ships/Nave-Special-Ouro.png"),
+    unlockScore: 28000,
+    description: "Nave especial dourada: laser dourado.",
+  },
 ];
 
 /**

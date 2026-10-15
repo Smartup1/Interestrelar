@@ -134,6 +134,44 @@ export const BOMB_PROFILES: Record<string, BombProfile> = {
     pointsPerClear: 10,
     laneHalfWidth: 0,
   },
+
+  // 🟣 Special: laser roxo exclusivo desta nave
+  special: {
+    name: "LASER ROXO",
+    color: "#9c27b0",
+    enemyDamage: base.enemyDamage,
+    bossPct: base.bossPct * 1.8,
+    invulnTicks: base.invulnTicks,
+    clearBullets: true,
+    clearObstacles: true,
+    pointsPerClear: 0,
+    laneHalfWidth: 80,
+    laser: {
+      halfWidth: 30,
+      durationTicks: 40,
+      enemyDmgPerTick: 4,
+      coreColor: "#f3e5f5",
+    },
+  },
+
+  // 🌟 Special Ouro: laser dourado exclusivo desta nave
+  "special-ouro": {
+    name: "LASER DOURADO",
+    color: "#ffb300",
+    enemyDamage: base.enemyDamage,
+    bossPct: base.bossPct * 2,
+    invulnTicks: base.invulnTicks,
+    clearBullets: true,
+    clearObstacles: true,
+    pointsPerClear: 0,
+    laneHalfWidth: 90,
+    laser: {
+      halfWidth: 36,
+      durationTicks: 44,
+      enemyDmgPerTick: 5,
+      coreColor: "#fff8e1",
+    },
+  },
 };
 
 export function getBombProfile(shipId?: string): BombProfile {
