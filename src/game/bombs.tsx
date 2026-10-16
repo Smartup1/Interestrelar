@@ -1,4 +1,5 @@
 import { GAME_CONFIG } from "../constants/gameConfig";
+import type { BombFxKind } from "../types/game";
 
 // ============================================================
 // BOMBA DE CADA NAVE
@@ -29,6 +30,8 @@ export interface BombProfile {
   /** se existir, a bomba é um LASER: um feixe que fica ligado na frente da
    *  nave por alguns segundos, causando dano a cada instante */
   laser?: LaserSpec;
+  /** efeito visual próprio da bomba (as de laser usam o feixe) */
+  fx?: BombFxKind;
 }
 
 export interface LaserSpec {
@@ -52,6 +55,7 @@ export const BOMB_PROFILES: Record<string, BombProfile> = {
   // 🚀 Explorer: a bomba "padrão" equilibrada
   explorer: {
     name: "NOVA",
+    fx: "nova",
     color: "#ffffff",
     ...base,
     clearBullets: true,
@@ -63,6 +67,7 @@ export const BOMB_PROFILES: Record<string, BombProfile> = {
   // 🛸 Shadow: relâmpago que mata tudo que é pequeno, fraco no chefão
   shadow: {
     name: "RELÂMPAGO",
+    fx: "lightning",
     color: "#ffee58",
     enemyDamage: 99,
     bossPct: base.bossPct * 0.5,
@@ -95,6 +100,7 @@ export const BOMB_PROFILES: Record<string, BombProfile> = {
   // 👾 Phantom: pulso que te deixa invulnerável por muito mais tempo
   phantom: {
     name: "PULSO FANTASMA",
+    fx: "ghost",
     color: "#b388ff",
     enemyDamage: Math.round(base.enemyDamage * 0.6),
     bossPct: base.bossPct * 0.6,
@@ -127,6 +133,7 @@ export const BOMB_PROFILES: Record<string, BombProfile> = {
   // ✨ Aurora: transforma tiros e asteroides apagados em pontos
   aurora: {
     name: "AURORA",
+    fx: "aurora",
     color: "#4dd0e1",
     ...base,
     clearBullets: true,
@@ -189,7 +196,18 @@ export interface BossShot {
   y: number;
   vx: number;
   vy: number;
+  color?: string;
+  r?: number;
 }
+
+/** Cor dos tiros de cada chefão (mesma ordem de BOSS_EMOJIS). */
+export const BOSS_COLORS = [
+  "#29d3ff", // 🛸 ciano
+  "#ff4dd8", // 👾 magenta
+  "#a259ff", // 🐙 roxo
+  "#ff8a00", // 👹 laranja
+  "#d6ff6a", // 💀 verde-osso
+];
 
 export const BOSS_SPECIAL_NAMES = [
   "CHUVA",      // 🛸
@@ -256,5 +274,109 @@ export function bossSpecial(
   }
 
   // Só os que descem (vy > 0) ou saem de lado importam; o resto sai da tela sozinho
-  return { name: BOSS_SPECIAL_NAMES[kind], shots };
+  const color = BOSS_COLORS[kind];
+  return {
+    name: BOSS_SPECIAL_NAMES[kind],
+    shots: shots.map((sh) => ({ ...sh, color, r: 9 })),
+  };
+}
+
+// ============================================================
+// TIRO NORMAL DE CADA CHEFÃO
+//
+// Cada chefão (pelo nível) tem o seu jeito de atirar, com cor e
+// tamanho de tiro próprios. `n` é o número do disparo (0, 1, 2...).
+// ============================================================
+
+export const BOSS_ATTACK_NAMES = [
+  "FILEIRA",   // 🛸
+  "GIRO",      // 👾
+  "ARCO",      // 🐙
+  "RAJADA",    // 👹
+  "PINÇA",     // 💀
+];
+
+export function bossAttack(
+  level: number,
+  isMid: boolean,
+  phase2: boolean,
+  sx: number,
+  sy: number,
+  px: number,
+  py: number,
+  n: number,
+  speed: number
+): BossShot[] {
+  const kind = (level - 1) % 5;
+  const color = BOSS_COLORS[kind];
+  const shots: BossShot[] = [];
+  const add = (vx: number, vy: number, r = 8, ox = 0, oy = 0) =>
+    shots.push({ x: sx + ox, y: sy + oy, vx, vy, color, r });
+
+  if (kind === 0) {
+    // 🛸 FILEIRA: uma linha de tiros lado a lado, depois diagonais
+    if (n % 2 === 0) {
+      for (const ox of [-60, -30, 0, 30, 60]) add(0, speed, 8, ox);
+    } else {
+      add(-3.2, speed * 0.9);
+      add(0, speed);
+      add(3.2, speed * 0.9);
+      if (phase2) {
+        const dx = px - sx;
+        const dy = py - sy;
+        const len = Math.hypot(dx, dy) || 1;
+        add((dx / len) * (speed + 1.5), (dy / len) * (speed + 1.5), 7);
+      }
+    }
+  } else if (kind === 1) {
+    // 👾 GIRO: braços de espiral que giram a cada disparo
+    const arms = phase2 ? 4 : 3;
+    for (let i = 0; i < arms; i++) {
+      const ang = n * 0.55 + (i / arms) * Math.PI * 2;
+      add(Math.sin(ang) * 4.8, Math.cos(ang) * 4.8, 7);
+    }
+  } else if (kind === 2) {
+    // 🐙 ARCO: leque que balança de lado a lado, cada tiro numa velocidade
+    const center = Math.sin(n * 0.8) * 0.6;
+    for (let i = -2; i <= 2; i++) {
+      const ang = center + i * 0.28;
+      const sp = 3.8 + (i + 2) * 0.7;
+      add(Math.sin(ang) * sp, Math.cos(ang) * sp, 9);
+    }
+  } else if (kind === 3) {
+    // 👹 RAJADA: tiros grandes e rápidos mirados em você
+    const dx = px - sx;
+    const dy = py - sy;
+    const len = Math.hypot(dx, dy) || 1;
+    const sp = speed + 2;
+    for (const off of [-1.4, 0, 1.4]) {
+      add((dx / len) * sp + off, (dy / len) * sp, 10);
+    }
+    if (phase2 && n % 3 === 2) {
+      for (let k = 0; k < 8; k++) {
+        const ang = (k / 8) * Math.PI * 2 + n * 0.2;
+        add(Math.sin(ang) * 3.2, Math.cos(ang) * 3.2, 11);
+      }
+    }
+  } else {
+    // 💀 PINÇA: tiros que descem se fechando em volta de onde você está
+    const vy = speed;
+    const t = Math.max(20, (py - sy) / vy);
+    for (let i = 0; i < 4; i++) {
+      const tx = px + (i - 1.5) * 52;
+      add((tx - sx) / t, vy, 8);
+    }
+    if (phase2) {
+      add(0, vy + 1.5, 7);
+    }
+  }
+
+  // Mini-chefe: ataque mais leve (sempre os tiros do meio)
+  if (isMid && shots.length > 3) {
+    const keep = Math.ceil(shots.length * 0.6);
+    const from = Math.floor((shots.length - keep) / 2);
+    return shots.slice(from, from + keep);
+  }
+
+  return shots;
 }
