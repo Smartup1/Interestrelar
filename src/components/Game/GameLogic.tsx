@@ -1,4 +1,4 @@
-import { getBombProfile, bossSpecial, bossAttack, BOSS_COLORS } from "../../game/bombs";
+import { getBombProfile, bossSpecial, bossAttack } from "../../game/bombs";
 import { useRef, useState, useEffect } from "react";
 
 import {
@@ -58,6 +58,8 @@ function getSpeedMultiplier(score: number): number {
 }
 
 const BOSS_EMOJIS = ["🛸", "👾", "🐙", "👹", "💀"];
+// cor da energia (aura) de cada chefão: ciano, magenta, roxo, laranja, verde
+const BOSS_AURA = ["#29d3ff", "#ff4dd8", "#a259ff", "#ff8a00", "#d6ff6a"];
 const MID_BOSS_EMOJIS = ["🛰️", "🤖", "🦂", "👺", "🧟"];
 
 const HALF = GAME_CONFIG.PLAYER_BOX / 2;
@@ -1067,7 +1069,7 @@ export function useGameLogic(shipId?: string) {
           y: by,
           wave,
           hitFlash: Math.max(0, boss.hitFlash - 1),
-          aura: BOSS_COLORS[(boss.level - 1) % 5],
+          aura: BOSS_AURA[(((boss.level || 1) - 1) % 5 + 5) % 5],
           charge: fxCharge,
           burst: fxBurst,
         };
