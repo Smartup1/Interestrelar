@@ -573,29 +573,32 @@ const PulsingCollectible = memo(
     c: Collectible;
     pulse: Animated.Value;
   }) {
+    // IMPORTANTE: a posição (que muda a cada tick) fica numa View comum e o
+    // pulso (Animated, driver nativo) fica num filho. Misturar os dois no
+    // mesmo `transform` faz o item travar na posição inicial (fora da tela)
+    // e ele "nunca aparece".
     return (
-      <Animated.Text
+      <View
+        pointerEvents="none"
         style={{
           position: "absolute",
-
           left: 0,
           top: 0,
-
-          fontSize: c.special
-            ? 34
-            : 28,
-
           transform: [
             { translateX: c.x },
             { translateY: c.y },
-            {
-              scale: pulse,
-            },
           ],
         }}
       >
-        {c.special ? "💎" : "💰"}
-      </Animated.Text>
+        <Animated.Text
+          style={{
+            fontSize: c.special ? 34 : 28,
+            transform: [{ scale: pulse }],
+          }}
+        >
+          {c.special ? "💎" : "💰"}
+        </Animated.Text>
+      </View>
     );
   }
 );
@@ -637,6 +640,88 @@ const ObstacleView = memo(
 
 /**
  * ============================================================
+ * FOGO DO MOTOR (inimigos e chefões)
+ * ============================================================
+ *
+ * Os inimigos descem, então o fogo sai por CIMA da nave. Sem Animated:
+ * o tremor vem do `seed` (que muda a cada tick), então não pesa.
+ */
+
+const EngineFlame = memo(function EngineFlame({
+  size,
+  seed,
+  core = "#fff3b0",
+  mid = "#ff9a1f",
+  outer = "#ff3b1f",
+}: {
+  size: number;
+  seed: number;
+  core?: string;
+  mid?: string;
+  outer?: string;
+}) {
+  const flick = 0.75 + 0.25 * Math.sin(seed * 1.7) + 0.1 * Math.sin(seed * 4.1);
+  const len = size * 0.55 * flick;
+  const w = size * 0.3;
+  const sway = Math.sin(seed * 0.9) * (size * 0.04);
+
+  return (
+    <View
+      pointerEvents="none"
+      style={{
+        position: "absolute",
+        left: 0,
+        right: 0,
+        top: -len + size * 0.1,
+        alignItems: "center",
+      }}
+    >
+      <View
+        style={{
+          width: w,
+          height: len,
+          borderTopLeftRadius: w,
+          borderTopRightRadius: w,
+          borderBottomLeftRadius: w / 2,
+          borderBottomRightRadius: w / 2,
+          backgroundColor: outer,
+          opacity: 0.55,
+          transform: [{ translateX: sway }],
+        }}
+      />
+      <View
+        style={{
+          position: "absolute",
+          bottom: 0,
+          width: w * 0.62,
+          height: len * 0.72,
+          borderTopLeftRadius: w,
+          borderTopRightRadius: w,
+          borderBottomLeftRadius: w / 2,
+          borderBottomRightRadius: w / 2,
+          backgroundColor: mid,
+          opacity: 0.85,
+          transform: [{ translateX: sway }],
+        }}
+      />
+      <View
+        style={{
+          position: "absolute",
+          bottom: 0,
+          width: w * 0.3,
+          height: len * 0.4,
+          borderRadius: w,
+          backgroundColor: core,
+          opacity: 0.95,
+          transform: [{ translateX: sway }],
+        }}
+      />
+    </View>
+  );
+});
+
+/**
+ * ============================================================
  * TIRO INIMIGO
  * ============================================================
  */
@@ -646,6 +731,9 @@ const EnemyBulletView = memo(function EnemyBulletView({
 }: {
   bullet: EnemyBullet;
 }) {
+  const r = bullet.r ?? 8;
+  const color = bullet.color ?? "#ff3b30";
+
   return (
     <View
       pointerEvents="none"
@@ -653,18 +741,37 @@ const EnemyBulletView = memo(function EnemyBulletView({
         position: "absolute",
         left: 0,
         top: 0,
-        width: 16,
-        height: 16,
-        borderRadius: 8,
-        backgroundColor: "#ff3b30",
+        width: r * 2,
+        height: r * 2,
+        borderRadius: r,
+        backgroundColor: color,
         borderWidth: 2,
-        borderColor: "#ffd2a0",
+        borderColor: "#ffffffaa",
+        shadowColor: color,
+        shadowOpacity: 1,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 0 },
+        elevation: 6,
         transform: [
-          { translateX: bullet.x - 8 },
-          { translateY: bullet.y - 8 },
+          { translateX: bullet.x - r },
+          { translateY: bullet.y - r },
         ],
       }}
-    />
+    >
+      {/* halo de energia em volta do tiro */}
+      <View
+        style={{
+          position: "absolute",
+          left: -r * 0.6,
+          top: -r * 0.6,
+          width: r * 3.2,
+          height: r * 3.2,
+          borderRadius: r * 1.6,
+          backgroundColor: color,
+          opacity: 0.22,
+        }}
+      />
+    </View>
   );
 });
 
@@ -681,8 +788,9 @@ const PowerUpView = memo(function PowerUpView({
   p: PowerUp;
   pulse: Animated.Value;
 }) {
+  // Posição numa View comum, pulso no filho (veja PulsingCollectible).
   return (
-    <Animated.View
+    <View
       pointerEvents="none"
       style={{
         position: "absolute",
@@ -690,29 +798,36 @@ const PowerUpView = memo(function PowerUpView({
         top: 0,
         width: 34,
         height: 34,
-        borderRadius: 17,
-        backgroundColor: p.kind === "B" ? "#1e88e5" : "#ff9500",
-        borderWidth: 2,
-        borderColor: "#ffffff",
-        alignItems: "center",
-        justifyContent: "center",
         transform: [
           { translateX: p.x - 17 },
           { translateY: p.y - 17 },
-          { scale: pulse },
         ],
       }}
     >
-      <Text
+      <Animated.View
         style={{
-          color: "#ffffff",
-          fontWeight: "900",
-          fontSize: p.kind === "B" ? 16 : 18,
+          width: 34,
+          height: 34,
+          borderRadius: 17,
+          backgroundColor: p.kind === "B" ? "#1e88e5" : "#ff9500",
+          borderWidth: 2,
+          borderColor: "#ffffff",
+          alignItems: "center",
+          justifyContent: "center",
+          transform: [{ scale: pulse }],
         }}
       >
-        {p.kind === "B" ? "💣" : "P"}
-      </Text>
-    </Animated.View>
+        <Text
+          style={{
+            color: "#ffffff",
+            fontWeight: "900",
+            fontSize: p.kind === "B" ? 16 : 18,
+          }}
+        >
+          {p.kind === "B" ? "💣" : "P"}
+        </Text>
+      </Animated.View>
+    </View>
   );
 });
 
@@ -732,6 +847,15 @@ const BossView = memo(function BossView({
   const barColor =
     pct > 0.5 ? "#33dd55" : pct > 0.25 ? "#ffcc00" : "#ff3322";
 
+  const aura = boss.aura ?? "#a259ff";
+  const charge = boss.charge ?? 0;
+  const burst = boss.burst;
+  const seed = boss.wave * 12;
+  // aura respira sozinha; quanto mais perto do especial, maior e mais forte
+  const breathe = 1 + 0.06 * Math.sin(seed * 0.8);
+  const auraSize = boss.size * (1.25 + charge * 0.5) * breathe;
+  const auraOpacity = 0.18 + charge * 0.4;
+
   return (
     <View
       pointerEvents="none"
@@ -749,6 +873,82 @@ const BossView = memo(function BossView({
         ],
       }}
     >
+      {/* ENERGIA GALÁCTICA: aura em camadas */}
+      <View
+        style={{
+          position: "absolute",
+          width: auraSize,
+          height: auraSize,
+          borderRadius: auraSize / 2,
+          backgroundColor: aura,
+          opacity: auraOpacity,
+        }}
+      />
+      <View
+        style={{
+          position: "absolute",
+          width: auraSize * 0.72,
+          height: auraSize * 0.72,
+          borderRadius: auraSize,
+          backgroundColor: aura,
+          opacity: auraOpacity * 0.9,
+        }}
+      />
+      {/* anel girando de energia quando está carregando */}
+      {charge > 0 && (
+        <View
+          style={{
+            position: "absolute",
+            width: auraSize * 1.1,
+            height: auraSize * 1.1,
+            borderRadius: auraSize,
+            borderWidth: 2 + charge * 3,
+            borderColor: "#ffffff",
+            opacity: 0.35 + charge * 0.5,
+            transform: [{ scale: 1.15 - charge * 0.25 }],
+          }}
+        />
+      )}
+      {/* ONDA DE CHOQUE logo após o ataque especial */}
+      {burst !== undefined && (
+        <View
+          style={{
+            position: "absolute",
+            width: boss.size * (1 + burst * 3.2),
+            height: boss.size * (1 + burst * 3.2),
+            borderRadius: boss.size * 3,
+            borderWidth: 4 * (1 - burst) + 1,
+            borderColor: aura,
+            backgroundColor: aura + "22",
+            opacity: 1 - burst,
+          }}
+        />
+      )}
+
+      {/* fogo dos motores (dois, um de cada lado) */}
+      <View
+        style={{
+          position: "absolute",
+          left: boss.size * 0.12,
+          top: boss.size * 0.12,
+          width: boss.size * 0.3,
+          height: 0,
+        }}
+      >
+        <EngineFlame size={boss.size * 0.55} seed={seed} outer={aura} />
+      </View>
+      <View
+        style={{
+          position: "absolute",
+          right: boss.size * 0.12,
+          top: boss.size * 0.12,
+          width: boss.size * 0.3,
+          height: 0,
+        }}
+      >
+        <EngineFlame size={boss.size * 0.55} seed={seed + 2} outer={aura} />
+      </View>
+
       {/* Barra de vida */}
       <View
         style={{
@@ -812,6 +1012,8 @@ const EnemyView = memo(function EnemyView({ e }: { e: Enemy }) {
         ],
       }}
     >
+      <EngineFlame size={e.size} seed={e.age + e.id} />
+
       <Text
         style={{
           fontSize: e.size * 0.85,

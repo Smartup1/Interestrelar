@@ -11,6 +11,8 @@ import { Enemy, EnemyKind } from "../types/game";
 
 interface KindDef {
   emoji: string;
+  /** 👇 chave do sprite SVG (ver sprites/index.tsx) */
+  spriteKey: string;
   size: number;
   hp: number;
   score: number;
@@ -19,15 +21,15 @@ interface KindDef {
 
 export const ENEMY_KINDS: Record<EnemyKind, KindDef> = {
   // Voa reto balançando de lado
-  scout: { emoji: "👾", size: 34, hp: 1, score: 100, fireEvery: 10 },
+  scout:   { emoji: "👾", spriteKey: "scout",   size: 34, hp: 1,  score: 100, fireEvery: 10 },
   // Entra pela lateral em curva
-  swooper: { emoji: "🛸", size: 36, hp: 2, score: 150, fireEvery: 10 },
+  swooper: { emoji: "🛸", spriteKey: "swooper", size: 36, hp: 2,  score: 150, fireEvery: 10 },
   // Para no alto e mergulha em cima do jogador
-  diver: { emoji: "👽", size: 36, hp: 2, score: 150, fireEvery: 10 },
+  diver:   { emoji: "👽", spriteKey: "diver",   size: 36, hp: 2,  score: 150, fireEvery: 10 },
   // Fica parado atirando na direção do jogador
-  gunner: { emoji: "🛰️", size: 42, hp: 5, score: 250, fireEvery: 50 },
+  gunner:  { emoji: "🛰️", spriteKey: "gunner",  size: 42, hp: 5,  score: 250, fireEvery: 50 },
   // Grande, atira em leque
-  heavy: { emoji: "🐙", size: 58, hp: 14, score: 600, fireEvery: 50 },
+  heavy:   { emoji: "🐙", spriteKey: "heavy",   size: 58, hp: 14, score: 600, fireEvery: 50 },
 };
 
 export interface SpawnOpts {
@@ -65,6 +67,7 @@ export function createEnemy(
     maxHp: hp,
     size: def.size,
     emoji: def.emoji,
+    spriteKey: def.spriteKey, // 👈 NOVO
     age: 0,
     vx: 0,
     vy: 0,
@@ -95,7 +98,7 @@ export function createEnemy(
 
     case "gunner":
       e.vy = 2.6 * speedScale;
-      e.phase = opts.y ?? 130; // altura onde fica parado
+      e.phase = opts.y ?? 130;
       break;
 
     case "heavy":
@@ -136,7 +139,7 @@ function aimed(
   const dx = px - sx;
   const dy = py - sy;
   const len = Math.hypot(dx, dy) || 1;
-  const ang = Math.atan2(dx, dy) + spread; // 0 = para baixo
+  const ang = Math.atan2(dx, dy) + spread;
   return {
     x: sx,
     y: sy,
@@ -145,10 +148,6 @@ function aimed(
   };
 }
 
-/**
- * Atualiza 1 tick do inimigo.
- * `enemy` volta null quando ele saiu da tela.
- */
 export function updateEnemy(
   e: Enemy,
   ctx: EnemyCtx
@@ -159,7 +158,6 @@ export function updateEnemy(
   const half = n.size / 2;
 
   switch (n.kind) {
-    // ---------------------------------------------------- scout
     case "scout": {
       n.y += n.vy;
       n.x = clamp(
@@ -170,26 +168,24 @@ export function updateEnemy(
       break;
     }
 
-    // -------------------------------------------------- swooper
     case "swooper": {
       n.x += n.vx;
-      n.vx -= n.dir * 0.16; // curva e volta
+      n.vx -= n.dir * 0.16;
       n.y += n.vy;
       break;
     }
 
-    // ---------------------------------------------------- diver
     case "diver": {
       if (n.state === 0) {
         n.y += n.vy;
         n.x = clamp(n.baseX + Math.sin(n.age * 0.1) * 12, half, W - half);
         if (n.y > 90 + (n.id % 3) * 30) {
           n.state = 1;
-          n.phase = 0; // contador de espera
+          n.phase = 0;
         }
       } else if (n.state === 1) {
         n.phase += 1;
-        n.x += Math.sin(n.phase * 2) * 1.5; // treme antes de mergulhar
+        n.x += Math.sin(n.phase * 2) * 1.5;
         if (n.phase >= 14) {
           const speed = 10 + Math.min(stage, 5) * 0.4;
           const dx = px - n.x;
@@ -206,7 +202,6 @@ export function updateEnemy(
       break;
     }
 
-    // ------------------------------------------- gunner / heavy
     case "gunner":
     case "heavy": {
       const hoverY = n.phase;
@@ -218,7 +213,7 @@ export function updateEnemy(
         if (n.y >= hoverY) {
           n.y = hoverY;
           n.state = 1;
-          n.age = 0; // conta o tempo parado
+          n.age = 0;
         }
       } else if (n.state === 1) {
         n.x = clamp(
@@ -250,19 +245,13 @@ export function updateEnemy(
           n.vy = 3.2;
         }
       } else {
-        n.y += n.vy; // vai embora
+        n.y += n.vy;
       }
       break;
     }
   }
 
-  // Saiu da tela?
-  if (
-    n.y > H + 70 ||
-    n.y < -140 ||
-    n.x < -140 ||
-    n.x > W + 140
-  ) {
+  if (n.y > H + 70 || n.y < -140 || n.x < -140 || n.x > W + 140) {
     return { enemy: null, shots };
   }
 

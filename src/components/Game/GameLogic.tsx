@@ -1,4 +1,4 @@
-import { getBombProfile, bossSpecial } from "../../game/bombs";
+import { getBombProfile, bossSpecial, bossAttack, BOSS_COLORS } from "../../game/bombs";
 import { useRef, useState, useEffect } from "react";
 
 import {
@@ -23,6 +23,7 @@ import {
   FxEvent,
   FxName,
   LaserState,
+  BombFxState,
 } from "../../types/game";
 
 import {
@@ -32,6 +33,8 @@ import {
 
 import {
   randomCoin,
+  respawnCollectible,
+  dropCollectible,
   createInitialCollectibles,
 } from "../../utils/collectibles";
 
@@ -94,6 +97,11 @@ export function useGameLogic(shipId?: string) {
   const [enemies, setEnemies] = useState<Enemy[]>([]);
   const [boss, setBoss] = useState<Boss | null>(null);
   const [laser, setLaser] = useState<LaserState | null>(null);
+
+  // Efeito visual da bomba (nova / relâmpago / fantasma / aurora)
+  const [bombFx, setBombFx] = useState<BombFxState | null>(null);
+  const bombFxSeq = useRef(0);
+  const bombFxTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [popups, setPopups] = useState<Popup[]>([]);
   const [explosions, setExplosions] = useState<Explosion[]>([]);
   const [trail, setTrail] = useState<Trail[]>([]);
@@ -343,6 +351,7 @@ export function useGameLogic(shipId?: string) {
 
       const newExplosions: Explosion[] = [];
       const newPowerUps: PowerUp[] = [];
+      const newDrops: Collectible[] = [];
       const newPopups: Popup[] = [];
 
       let nextObstacles = obstaclesRef.current.slice();
@@ -426,6 +435,22 @@ export function useGameLogic(shipId?: string) {
         }
       };
 
+      // Moedas (💰) e gemas (💎) que caem do inimigo destruído
+      const dropLoot = (e: Enemy) => {
+        const chance =
+          e.kind === "heavy" ? 1 : e.kind === "gunner" ? 0.5 : 0.3;
+        if (Math.random() >= chance) return;
+        newDrops.push(
+          dropCollectible(collectibleId.current++, e.x, e.y, false, 0)
+        );
+        // grandalhão ainda solta uma gema de vez em quando
+        if (e.kind === "heavy" && Math.random() < 0.35) {
+          newDrops.push(
+            dropCollectible(collectibleId.current++, e.x, e.y, true, 18)
+          );
+        }
+      };
+
       const killEnemy = (idx: number) => {
         const e = nextEnemies[idx];
         if (!e) return;
@@ -433,6 +458,7 @@ export function useGameLogic(shipId?: string) {
         registerKill();
         explode(e.x, e.y);
         dropFor(e);
+        dropLoot(e);
         nextEnemies[idx] = null;
       };
 
@@ -531,6 +557,19 @@ export function useGameLogic(shipId?: string) {
           }
         }
 
+        // Alvos atingidos (o relâmpago desce até cada um)
+        const bombTargets: { x: number; y: number }[] = [];
+        if (!bp.laser && bp.fx) {
+          for (const en of nextEnemies) {
+            if (en && en.y > -10 && inLane(en.x) && bombTargets.length < 8) {
+              bombTargets.push({ x: en.x, y: en.y });
+            }
+          }
+          if (boss && boss.y > -boss.size * 0.3 && inLane(boss.x)) {
+            bombTargets.push({ x: boss.x, y: boss.y });
+          }
+        }
+
         for (let i = 0; i < nextEnemies.length; i++) {
           const en = nextEnemies[i];
           if (!bp.laser && en && inLane(en.x)) hitEnemy(i, bp.enemyDamage);
@@ -549,6 +588,19 @@ export function useGameLogic(shipId?: string) {
 
         popup(pcx, pcy - 50, bp.name, bp.color);
         fxQueue.current.push(bp.laser ? "laser" : "bomb");
+
+        if (!bp.laser && bp.fx) {
+          if (bombFxTimer.current) clearTimeout(bombFxTimer.current);
+          setBombFx({
+            id: ++bombFxSeq.current,
+            kind: bp.fx,
+            x: pcx,
+            y: pcy,
+            color: bp.color,
+            targets: bombTargets,
+          });
+          bombFxTimer.current = setTimeout(() => setBombFx(null), 1800);
+        }
       }
 
       // ------------------------------------------------------
@@ -840,6 +892,35 @@ export function useGameLogic(shipId?: string) {
 
         // (antes aqui caía o item "P"/"B"; agora o chefão solta filhotes, veja abaixo)
 
+        // Chuva de moedas e gemas saindo do chefão
+        {
+          const coinsN = wasMid ? 5 : 9;
+          for (let k = 0; k < coinsN; k++) {
+            const t = k / (coinsN - 1) - 0.5;
+            newDrops.push(
+              dropCollectible(
+                collectibleId.current++,
+                boss.x,
+                boss.y + (k % 3) * 14,
+                false,
+                t * boss.size * 1.4
+              )
+            );
+          }
+          const gemsN = wasMid ? 1 : 3;
+          for (let k = 0; k < gemsN; k++) {
+            newDrops.push(
+              dropCollectible(
+                collectibleId.current++,
+                boss.x,
+                boss.y - 10,
+                true,
+                (k - (gemsN - 1) / 2) * 40
+              )
+            );
+          }
+        }
+
         enemyBulletsRef.current = [];
         fxQueue.current.push("bossdead");
 
@@ -969,12 +1050,26 @@ export function useGameLogic(shipId?: string) {
           by = targetY + Math.sin(wave * 0.7) * 14;
         }
 
+        // Energia galáctica: aura, carga antes do especial e onda de choque depois
+        const fxBt = tick - boss.spawnTick;
+        const fxEvery = phase2 ? 130 : 200;
+        const fxPos = fxBt > 0 ? fxBt % fxEvery : 0;
+        let fxCharge = 0;
+        let fxBurst: number | undefined = undefined;
+        if (entered && !boss.isMid) {
+          if (fxPos >= fxEvery - 30) fxCharge = (fxPos - (fxEvery - 30)) / 30;
+          else if (fxPos < 16 && fxBt > 0) fxBurst = fxPos / 16;
+        }
+
         boss = {
           ...boss,
           x: bx,
           y: by,
           wave,
           hitFlash: Math.max(0, boss.hitFlash - 1),
+          aura: BOSS_COLORS[(boss.level - 1) % 5],
+          charge: fxCharge,
+          burst: fxBurst,
         };
 
         if (entered) {
@@ -1014,59 +1109,23 @@ export function useGameLogic(shipId?: string) {
 
           if (bt % every === 0) {
             const n = Math.floor(bt / every);
-            const sx = boss.x;
-            const sy = boss.y + boss.size * 0.4;
             const speed = 6.5 + Math.min(boss.level, 4) * 0.5;
-            const pattern = n % 3;
 
-            if (phase2 && pattern === 1) {
-              // Mirado no jogador + 2 laterais
-              const dx = pcx - sx;
-              const dy = pcy - sy;
-              const len = Math.hypot(dx, dy) || 1;
-              const ux = (dx / len) * (speed + 1.5);
-              const uy = (dy / len) * (speed + 1.5);
+            // Cada chefão atira do seu jeito (cor, tamanho e padrão próprios)
+            const volley = bossAttack(
+              boss.level,
+              boss.isMid,
+              phase2,
+              boss.x,
+              boss.y + boss.size * 0.4,
+              pcx,
+              pcy,
+              n,
+              speed
+            );
 
-              [-1.5, 0, 1.5].forEach((off) => {
-                enemyNew.push({
-                  id: enemyBulletId.current++,
-                  x: sx,
-                  y: sy,
-                  vx: ux + off,
-                  vy: uy,
-                });
-              });
-            } else if (
-              phase2 &&
-              pattern === 2 &&
-              boss.level >= 2 &&
-              !boss.isMid
-            ) {
-              // Anel de tiros
-              for (let k = 0; k < 12; k++) {
-                const ang = (k / 12) * Math.PI * 2 + n * 0.2;
-                enemyNew.push({
-                  id: enemyBulletId.current++,
-                  x: sx,
-                  y: sy,
-                  vx: Math.sin(ang) * 5.2,
-                  vy: Math.cos(ang) * 5.2,
-                });
-              }
-            } else {
-              // Leque (3 tiros; 5 a partir da fase 2)
-              const spread =
-                boss.level >= 2 ? [-3, -1.5, 0, 1.5, 3] : [-2, 0, 2];
-
-              spread.forEach((vx) => {
-                enemyNew.push({
-                  id: enemyBulletId.current++,
-                  x: sx,
-                  y: sy,
-                  vx,
-                  vy: speed,
-                });
-              });
+            for (const s of volley) {
+              enemyNew.push({ id: enemyBulletId.current++, ...s });
             }
           }
         }
@@ -1176,11 +1235,16 @@ export function useGameLogic(shipId?: string) {
       // 9. MOEDAS E GEMAS
       // ======================================================
 
-      const nextCollectibles = collectiblesRef.current.map((c) => {
+      const nextCollectibles: Collectible[] = [];
+
+      for (const c of [...collectiblesRef.current, ...newDrops]) {
         const ny = c.y + c.speed * speedMult;
+        const nx = c.vx
+          ? Math.max(0, Math.min(WIDTH - 32, c.x + c.vx * c.speed))
+          : c.x;
 
         if (
-          Math.abs(c.x + 16 - pcx) < 40 &&
+          Math.abs(nx + 16 - pcx) < 40 &&
           Math.abs(ny + 16 - pcy) < 46
         ) {
           fxQueue.current.push("collect");
@@ -1198,15 +1262,26 @@ export function useGameLogic(shipId?: string) {
             setCoins((v) => v + 1);
           }
 
-          return randomCoin(collectibleId.current++, c.special);
+          // Item "fixo" do cenário volta depois; o que caiu de inimigo some
+          if (!c.drop) {
+            nextCollectibles.push(
+              respawnCollectible(collectibleId.current++, c.special)
+            );
+          }
+          continue;
         }
 
         if (ny > HEIGHT + 60) {
-          return randomCoin(collectibleId.current++, c.special);
+          if (!c.drop) {
+            nextCollectibles.push(
+              respawnCollectible(collectibleId.current++, c.special)
+            );
+          }
+          continue;
         }
 
-        return { ...c, y: ny };
-      });
+        nextCollectibles.push({ ...c, x: nx, y: ny });
+      }
 
       collectiblesRef.current = nextCollectibles;
 
@@ -1367,6 +1442,8 @@ export function useGameLogic(shipId?: string) {
     bombPending.current = false;
     laserRef.current = null;
     setLaser(null);
+    if (bombFxTimer.current) clearTimeout(bombFxTimer.current);
+    setBombFx(null);
     lastBombTick.current = -100;
 
     invulnUntil.current = 0;
@@ -1495,6 +1572,7 @@ export function useGameLogic(shipId?: string) {
     shoot,
     fireBomb,
     laser,
+    bombFx,
     isInvulnerable,
     restartGame,
     movePlayer,
