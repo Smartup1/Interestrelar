@@ -660,9 +660,9 @@ const EngineFlame = memo(function EngineFlame({
   mid?: string;
   outer?: string;
 }) {
-  const flick = 0.75 + 0.25 * Math.sin(seed * 1.7) + 0.1 * Math.sin(seed * 4.1);
-  const len = size * 0.55 * flick;
-  const w = size * 0.3;
+  const flick = 0.9 + 0.2 * Math.sin(seed * 1.7) + 0.1 * Math.sin(seed * 4.1);
+  const len = Math.max(16, size * 0.95 * flick);
+  const w = Math.max(10, size * 0.38);
   const sway = Math.sin(seed * 0.9) * (size * 0.04);
 
   return (
@@ -685,7 +685,7 @@ const EngineFlame = memo(function EngineFlame({
           borderBottomLeftRadius: w / 2,
           borderBottomRightRadius: w / 2,
           backgroundColor: outer,
-          opacity: 0.55,
+          opacity: 0.8,
           transform: [{ translateX: sway }],
         }}
       />
